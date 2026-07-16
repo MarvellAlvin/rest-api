@@ -1,0 +1,81 @@
+{
+  "name": "Base API - All Media Downloader",
+  "version": "1.0.0",
+  "author": "@velz",
+  "description": "API untuk mendownload berbagai media dari platform populer (TikTok, Instagram, YouTube, dll.) tanpa batasan dan tanpa API key.",
+  "endpoints": [
+    {
+      "path": "/api/all-dl",
+      "method": "GET | POST",
+      "description": "Mendownload media dari URL yang diberikan dengan tool tertentu.",
+      "parameters": [
+        {
+          "name": "url",
+          "type": "string",
+          "required": true,
+          "description": "URL dari konten yang ingin diunduh (harus menggunakan HTTPS)."
+        },
+        {
+          "name": "tool",
+          "type": "string",
+          "required": true,
+          "description": "Nama tool/downloader yang akan digunakan. Daftar lengkap tersedia di bawah.",
+          "example": "tiktok-video-downloader"
+        }
+      ],
+      "example_request": {
+        "url": "https://www.tiktok.com/@user/video/123456789",
+        "tool": "tiktok-video-downloader"
+      },
+      "example_response": {
+        "status": true,
+        "statusCode": 200,
+        "author": "@velz",
+        "result": {
+          "items": [
+            {
+              "title": "Judul video",
+              "url": "https://...",
+              "quality": "MP4 · 1.3 MB · No watermark",
+              "thumbnail": "https://..."
+            }
+          ]
+        },
+        "responseTimeMs": 1874,
+        "timestamp": "2026-07-16T23:06:48.729Z"
+      },
+      "error_response": {
+        "status": false,
+        "statusCode": 400,
+        "author": "@velz",
+        "error": "Parameter \"url\" wajib diisi.",
+        "responseTimeMs": 5,
+        "timestamp": "2026-07-17T00:00:00.000Z"
+      }
+    }
+  ],
+  "available_tools": [
+    "apple-music-downloader",
+    "douyin-downloader",
+    "facebook-video-downloader",
+    "instagram-reels-downloader",
+    "instagram-story-downloader",
+    "instagram-video-downloader",
+    "likee-downloader",
+    "linkedin-video-downloader",
+    "pinterest-video-downloader",
+    "soundcloud-downloader",
+    "spotify-downloader",
+    "tiktok-photo-downloader",
+    "tiktok-story-downloader",
+    "tiktok-video-downloader",
+    "twitter-gif-downloader",
+    "twitter-video-downloader",
+    "youtube-monetization-checker",
+    "youtube-money-calculator",
+    "youtube-tags-extractor",
+    "youtube-thumbnail-downloader",
+    "youtube-transcript",
+    "youtube-video-downloader"
+  ]
+}
