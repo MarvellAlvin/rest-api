@@ -1,8 +1,15 @@
 // api/all-dl.js
-const { igdl } = require('@zenaveline/scraper');
+const {
+    youtube,
+    tiktok,
+    instagram,
+    twitter,
+    facebook,
+    savefrom
+} = require('@bochilteam/scraper');
 
 /**
- * Deteksi platform dari URL (hanya untuk metadata)
+ * Deteksi platform dari URL
  */
 function detectPlatform(url) {
     const lower = url.toLowerCase();
@@ -15,12 +22,33 @@ function detectPlatform(url) {
 }
 
 /**
- * Normalisasi hasil dari igdl ke format items
+ * Pilih scraper berdasarkan platform
  */
-function normalizeIgdlResult(data) {
+async function getScraper(url, platform) {
+    switch (platform) {
+        case 'youtube':
+            return await youtube(url);
+        case 'tiktok':
+            return await tiktok(url);
+        case 'instagram':
+            return await instagram(url);
+        case 'twitter':
+            return await twitter(url);
+        case 'facebook':
+            return await facebook(url);
+        default:
+            // Fallback ke savefrom untuk platform lain
+            return await savefrom(url);
+    }
+}
+
+/**
+ * Normalisasi hasil scraper ke format items
+ */
+function normalizeResult(data, platform) {
     let items = [];
 
-    // Jika data berupa array (beberapa media)
+    // Jika data berupa array
     if (Array.isArray(data)) {
         data.forEach(item => {
             if (item.url) {
@@ -29,14 +57,14 @@ function normalizeIgdlResult(data) {
                     url: item.url,
                     quality: item.quality || 'Best',
                     thumbnail: item.thumbnail || '',
-                    type: item.type || 'video'
+                    type: item.type || (item.url.includes('audio') ? 'audio' : 'video')
                 });
             }
         });
-    }
+    } 
     // Jika data berupa objek tunggal
     else if (data && typeof data === 'object') {
-        // Cek properti umum
+        // Coba ambil dari properti umum
         const possibleUrls = [data.url, data.downloadUrl, data.link, data.videoUrl, data.audioUrl];
         const foundUrl = possibleUrls.find(u => u);
         if (foundUrl) {
@@ -48,7 +76,8 @@ function normalizeIgdlResult(data) {
                 type: data.type || (foundUrl.includes('audio') ? 'audio' : 'video')
             });
         }
-        // Jika ada sub-properti seperti 'hd', 'sd', dll.
+
+        // Cek sub-properti (hd, sd, audio, dll.)
         for (const key of ['hd', 'sd', 'low', 'high', 'audio']) {
             if (data[key] && typeof data[key] === 'object' && data[key].url) {
                 items.push({
@@ -60,11 +89,29 @@ function normalizeIgdlResult(data) {
                 });
             }
         }
+
+        // Jika platform Instagram dan ada properti 'media' (array)
+        if (platform === 'instagram' && data.media && Array.isArray(data.media)) {
+            data.media.forEach(item => {
+                if (item.url) {
+                    items.push({
+                        title: data.title || 'Media',
+                        url: item.url,
+                        quality: item.quality || 'Best',
+                        thumbnail: item.thumbnail || '',
+                        type: item.type || 'video'
+                    });
+                }
+            });
+        }
     }
 
     // Jika masih kosong, coba ambil dari properti 'result' atau 'data'
     if (items.length === 0 && data.result) {
-        return normalizeIgdlResult(data.result);
+        return normalizeResult(data.result, platform);
+    }
+    if (items.length === 0 && data.data) {
+        return normalizeResult(data.data, platform);
     }
 
     return items;
@@ -92,11 +139,11 @@ module.exports = async (req, res) => {
     const platform = detectPlatform(url);
 
     try {
-        // Panggil igdl dari @zenaveline/scraper
-        const rawResult = await igdl(url);
+        // Panggil scraper yang sesuai
+        const rawResult = await getScraper(url, platform);
 
         // Normalisasi hasil
-        const items = normalizeIgdlResult(rawResult);
+        const items = normalizeResult(rawResult, platform);
 
         // Jika tidak ada items, lempar error
         if (items.length === 0) {
