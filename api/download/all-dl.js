@@ -1,30 +1,20 @@
 const axios = require('axios');
 
-// Daftar tool/platform yang didukung oleh socialdownloader.space
-// Berdasarkan dokumentasi, platform yang didukung: TikTok, Twitter/X, Instagram, Facebook, YouTube[reference:6]
-const supportedPlatforms = [
-  'tiktok',
-  'twitter', 
-  'x',
-  'instagram',
-  'facebook',
-  'youtube'
-];
+// Base URL untuk socialdownloader.space
+const SOCIAL_DOWNLOADER_BASE = 'https://www.socialdownloader.space';
 
 /**
  * Mendownload media menggunakan API socialdownloader.space
- * Dokumentasi: https://github.com/Vette1123/social-media-downloader#api-reference[reference:7]
+ * Dokumentasi: https://github.com/Vette1123/social-media-downloader#api-reference
  */
 async function socialDownloader(url) {
   try {
-    // Validasi URL
     if (!url.includes('https://')) {
       throw new Error('Invalid url. URL harus menggunakan HTTPS.');
     }
 
-    // Kirim request ke API socialdownloader.space
     const { data } = await axios.post(
-      'https://www.socialdownloader.space/api/download',
+      `${SOCIAL_DOWNLOADER_BASE}/api/download`,
       { url: url },
       {
         headers: {
@@ -34,7 +24,6 @@ async function socialDownloader(url) {
       }
     );
 
-    // Cek apakah request berhasil
     if (!data.success) {
       throw new Error(data.error || 'Gagal mendapatkan data dari socialdownloader.space');
     }
@@ -46,7 +35,22 @@ async function socialDownloader(url) {
 }
 
 /**
- * Mendeteksi platform dari URL
+ * Mengubah URL relatif menjadi absolut terhadap base socialdownloader
+ */
+function absolutizeUrl(relativeUrl) {
+  if (!relativeUrl) return null;
+  try {
+    // Coba buat URL – jika berhasil berarti sudah absolut
+    new URL(relativeUrl);
+    return relativeUrl;
+  } catch {
+    // Jika gagal, gabungkan dengan base
+    return new URL(relativeUrl, SOCIAL_DOWNLOADER_BASE).href;
+  }
+}
+
+/**
+ * Deteksi platform dari URL
  */
 function detectPlatform(url) {
   const urlLower = url.toLowerCase();
@@ -58,14 +62,27 @@ function detectPlatform(url) {
   return null;
 }
 
+/**
+ * Mendeteksi tipe media dari URL (video/audio/image)
+ */
+function detectMediaType(url) {
+  if (!url) return 'video';
+  const lower = url.toLowerCase();
+  if (/\.(mp3|m4a|wav|ogg|aac|flac)\b/.test(lower) || /[?&]audio=1/.test(lower)) return 'audio';
+  if (/\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|ico)\b/.test(lower)) return 'image';
+  if (/\.(mp4|mov|webm|avi|mkv|flv|3gp|m4v)\b/.test(lower)) return 'video';
+  // Jika tidak ada ekstensi, coba deteksi dari parameter
+  if (lower.includes('audio')) return 'audio';
+  if (lower.includes('image')) return 'image';
+  return 'video';
+}
+
 // ===== Route Handler Express =====
 module.exports = async (req, res) => {
   const startTime = Date.now();
 
-  // Ambil parameter dari query (GET) atau body (POST)
   const { url } = req.method === 'GET' ? req.query : req.body;
 
-  // Validasi URL
   if (!url) {
     return res.status(400).json({
       status: false,
@@ -77,7 +94,6 @@ module.exports = async (req, res) => {
     });
   }
 
-  // Deteksi platform secara otomatis
   const platform = detectPlatform(url);
   if (!platform) {
     return res.status(400).json({
@@ -93,39 +109,51 @@ module.exports = async (req, res) => {
   try {
     const result = await socialDownloader(url);
 
-    // Format hasil sesuai dengan struktur yang diinginkan
     let items = [];
 
+    // Jika ada images (carousel foto)
     if (result.metadata?.images && result.metadata.images.length > 0) {
-      // Ini adalah carousel foto - setiap image jadi satu item[reference:8]
-      items = result.metadata.images.map((imgUrl, index) => ({
-        title: result.metadata.title || `Image ${index + 1}`,
-        url: imgUrl,
-        quality: 'Image',
-        thumbnail: imgUrl
-      }));
-    } else if (result.downloadUrl) {
-      // Ini adalah video[reference:9]
-      items = [
-        {
-          title: result.metadata?.title || 'Video',
-          url: result.downloadUrl,
-          quality: 'Video',
-          thumbnail: result.metadata?.thumbnail || ''
-        }
-      ];
-      
-      // Jika ada audio, tambahkan sebagai item terpisah
-      if (result.audioUrl) {
+      items = result.metadata.images.map((imgUrl, index) => {
+        const absoluteUrl = absolutizeUrl(imgUrl);
+        return {
+          title: result.metadata.title || `Image ${index + 1}`,
+          url: absoluteUrl,
+          quality: 'Image',
+          thumbnail: absoluteUrl,
+          type: 'image'
+        };
+      });
+    } else {
+      // Video atau audio
+      const downloadUrl = absolutizeUrl(result.downloadUrl);
+      const audioUrl = absolutizeUrl(result.audioUrl);
+      const thumbnail = absolutizeUrl(result.metadata?.thumbnail) || '';
+
+      if (downloadUrl) {
+        const type = detectMediaType(downloadUrl);
         items.push({
-          title: (result.metadata?.title || 'Audio') + ' · Audio',
-          url: result.audioUrl,
-          quality: 'MP3 · Audio',
-          thumbnail: result.metadata?.thumbnail || ''
+          title: result.metadata?.title || 'Video',
+          url: downloadUrl,
+          quality: 'Video',
+          thumbnail: thumbnail,
+          type: type
         });
       }
-    } else {
-      throw new Error('Tidak ada media yang dapat diunduh dari URL ini.');
+
+      if (audioUrl) {
+        items.push({
+          title: (result.metadata?.title || 'Audio') + ' · Audio',
+          url: audioUrl,
+          quality: 'MP3 · Audio',
+          thumbnail: thumbnail,
+          type: 'audio'
+        });
+      }
+
+      // Jika tidak ada downloadUrl dan audioUrl, mungkin error
+      if (items.length === 0) {
+        throw new Error('Tidak ada media yang dapat diunduh dari URL ini.');
+      }
     }
 
     const response = {
