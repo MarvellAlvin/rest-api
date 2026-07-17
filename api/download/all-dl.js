@@ -1,16 +1,8 @@
 // api/all-dl.js
-const axios = require('axios');
-const {
-    savefrom,
-    youtube,
-    tiktok,
-    instagram,
-    twitter,
-    facebook
-} = require('@bochilteam/scraper');
+const { savefrom } = require('@bochilteam/scraper');
 
 /**
- * Deteksi platform dari URL
+ * Deteksi platform dari URL (hanya untuk metadata)
  */
 function detectPlatform(url) {
     const lower = url.toLowerCase();
@@ -23,85 +15,56 @@ function detectPlatform(url) {
 }
 
 /**
- * Pilih scraper berdasarkan platform
+ * Normalisasi hasil dari savefrom ke format items
  */
-async function getScraper(url, platform) {
-    switch (platform) {
-        case 'youtube':
-            return await youtube(url);
-        case 'tiktok':
-            return await tiktok(url);
-        case 'instagram':
-            return await instagram(url);
-        case 'twitter':
-            return await twitter(url);
-        case 'facebook':
-            return await facebook(url);
-        default:
-            // Fallback ke savefrom untuk platform lain
-            return await savefrom(url);
-    }
-}
-
-/**
- * Normalisasi hasil scraper ke format items
- */
-function normalizeResult(data, platform) {
+function normalizeSavefromResult(data) {
     let items = [];
 
-    // Cek apakah data memiliki properti 'url' (video tunggal)
-    if (data.url) {
-        items.push({
-            title: data.title || 'Media',
-            url: data.url,
-            quality: data.quality || 'Best',
-            thumbnail: data.thumbnail || '',
-            type: 'video'
+    // Jika data berupa array (beberapa link)
+    if (Array.isArray(data)) {
+        data.forEach(item => {
+            if (item.url) {
+                items.push({
+                    title: item.title || 'Media',
+                    url: item.url,
+                    quality: item.quality || 'Best',
+                    thumbnail: item.thumbnail || '',
+                    type: item.type || 'video'
+                });
+            }
         });
-    }
-
-    // Cek jika ada 'urls' (array of videos)
-    if (data.urls && Array.isArray(data.urls)) {
-        data.urls.forEach(item => {
+    } 
+    // Jika data berupa objek tunggal
+    else if (data && typeof data === 'object') {
+        // Cek properti umum
+        const possibleUrls = [data.url, data.downloadUrl, data.link, data.videoUrl, data.audioUrl];
+        const foundUrl = possibleUrls.find(u => u);
+        if (foundUrl) {
             items.push({
-                title: item.title || data.title || 'Media',
-                url: item.url,
-                quality: item.quality || 'Best',
-                thumbnail: item.thumbnail || data.thumbnail || '',
-                type: 'video'
+                title: data.title || 'Media',
+                url: foundUrl,
+                quality: data.quality || 'Best',
+                thumbnail: data.thumbnail || '',
+                type: data.type || (foundUrl.includes('audio') ? 'audio' : 'video')
             });
-        });
-    }
-
-    // Cek jika ada 'audio' (audio stream)
-    if (data.audio) {
-        items.push({
-            title: (data.title || 'Audio') + ' · Audio',
-            url: data.audio,
-            quality: 'MP3 · Audio',
-            thumbnail: data.thumbnail || '',
-            type: 'audio'
-        });
-    }
-
-    // Jika masih kosong, coba ambil dari properti lain
-    if (items.length === 0) {
-        // Coba ambil dari 'result' atau 'data'
-        const result = data.result || data.data || data;
-        if (typeof result === 'object' && result !== null) {
-            for (const key of ['url', 'downloadUrl', 'link', 'videoUrl', 'audioUrl']) {
-                if (result[key]) {
-                    items.push({
-                        title: result.title || 'Media',
-                        url: result[key],
-                        quality: 'Best',
-                        thumbnail: result.thumbnail || '',
-                        type: key.includes('audio') ? 'audio' : 'video'
-                    });
-                    break;
-                }
+        }
+        // Jika ada sub-properti seperti 'hd', 'sd', dll.
+        for (const key of ['hd', 'sd', 'low', 'high', 'audio']) {
+            if (data[key] && typeof data[key] === 'object' && data[key].url) {
+                items.push({
+                    title: data.title || 'Media',
+                    url: data[key].url,
+                    quality: key.toUpperCase(),
+                    thumbnail: data.thumbnail || '',
+                    type: key === 'audio' ? 'audio' : 'video'
+                });
             }
         }
+    }
+
+    // Jika masih kosong, coba ambil dari properti 'result' atau 'data'
+    if (items.length === 0 && data.result) {
+        return normalizeSavefromResult(data.result);
     }
 
     return items;
@@ -126,22 +89,21 @@ module.exports = async (req, res) => {
         });
     }
 
-    // Deteksi platform
     const platform = detectPlatform(url);
 
     try {
-        // Panggil scraper yang sesuai
-        const rawResult = await getScraper(url, platform);
+        // Panggil savefrom
+        const rawResult = await savefrom(url);
 
         // Normalisasi hasil
-        const items = normalizeResult(rawResult, platform);
+        const items = normalizeSavefromResult(rawResult);
 
         // Jika tidak ada items, lempar error
         if (items.length === 0) {
             throw new Error('Tidak ada media yang ditemukan dari URL ini.');
         }
 
-        // Ambil metadata
+        // Ambil metadata dari item pertama
         const firstItem = items[0];
         const title = firstItem.title || 'Media';
         const thumbnail = firstItem.thumbnail || '';
@@ -165,34 +127,6 @@ module.exports = async (req, res) => {
 
         res.status(200).json(response);
     } catch (error) {
-        // Jika error, coba fallback ke savefrom (untuk platform yang tidak didukung)
-        if (platform === 'unknown') {
-            try {
-                const fallbackResult = await savefrom(url);
-                const fallbackItems = normalizeResult(fallbackResult, 'savefrom');
-                if (fallbackItems.length > 0) {
-                    const response = {
-                        status: true,
-                        statusCode: 200,
-                        author: '@velz',
-                        result: {
-                            items: fallbackItems,
-                            metadata: {
-                                platform: 'savefrom',
-                                author: 'Unknown',
-                                title: fallbackItems[0]?.title || 'Media'
-                            }
-                        },
-                        responseTimeMs: Date.now() - startTime,
-                        timestamp: new Date().toISOString()
-                    };
-                    return res.status(200).json(response);
-                }
-            } catch (fallbackError) {
-                // Jika fallback juga gagal, lanjut ke error utama
-            }
-        }
-
         // Kirim error
         res.status(500).json({
             status: false,
