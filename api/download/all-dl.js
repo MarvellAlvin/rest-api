@@ -3,8 +3,18 @@ const axios = require('axios');
 const SOCIAL_DOWNLOADER_BASE = 'https://www.socialdownloader.space';
 
 /**
- * Mendownload media menggunakan API socialdownloader.space
+ * Mengubah URL relatif menjadi absolut terhadap base socialdownloader
  */
+function toAbsoluteUrl(relativeUrl) {
+    if (!relativeUrl) return null;
+    try {
+        new URL(relativeUrl);
+        return relativeUrl; // Sudah absolut
+    } catch {
+        return new URL(relativeUrl, SOCIAL_DOWNLOADER_BASE).href;
+    }
+}
+
 async function socialDownloader(url) {
     try {
         if (!url.includes('https://')) {
@@ -33,20 +43,16 @@ async function socialDownloader(url) {
 }
 
 /**
- * Mengubah URL media menjadi URL proxy kita sendiri
- * agar frontend tidak perlu repot dengan header
+ * Ubah URL absolut menjadi proxy internal kita
  */
-function toProxyUrl(originalUrl) {
-    if (!originalUrl) return null;
+function toProxyUrl(absoluteUrl) {
+    if (!absoluteUrl) return null;
     // Jika sudah berupa proxy kita, biarkan
-    if (originalUrl.startsWith('/api/proxy')) return originalUrl;
+    if (absoluteUrl.startsWith('/api/proxy')) return absoluteUrl;
     // Kirimkan ke endpoint proxy kita dengan url yang di-encode
-    return `/api/proxy?url=${encodeURIComponent(originalUrl)}`;
+    return `/api/proxy?url=${encodeURIComponent(absoluteUrl)}`;
 }
 
-/**
- * Deteksi platform dari URL
- */
 function detectPlatform(url) {
     const urlLower = url.toLowerCase();
     if (urlLower.includes('tiktok.com')) return 'tiktok';
@@ -57,9 +63,6 @@ function detectPlatform(url) {
     return null;
 }
 
-/**
- * Mendeteksi tipe media dari URL (video/audio/image)
- */
 function detectMediaType(url) {
     if (!url) return 'video';
     const lower = url.toLowerCase();
@@ -71,7 +74,6 @@ function detectMediaType(url) {
     return 'video';
 }
 
-// ===== Route Handler Express =====
 module.exports = async (req, res) => {
     const startTime = Date.now();
 
@@ -108,7 +110,8 @@ module.exports = async (req, res) => {
         // Jika ada images (carousel foto)
         if (result.metadata?.images && result.metadata.images.length > 0) {
             items = result.metadata.images.map((imgUrl, index) => {
-                const proxyUrl = toProxyUrl(imgUrl);
+                const absoluteUrl = toAbsoluteUrl(imgUrl);
+                const proxyUrl = toProxyUrl(absoluteUrl);
                 return {
                     title: result.metadata.title || `Image ${index + 1}`,
                     url: proxyUrl,
@@ -119,9 +122,13 @@ module.exports = async (req, res) => {
             });
         } else {
             // Video atau audio
-            const downloadUrl = toProxyUrl(result.downloadUrl);
-            const audioUrl = toProxyUrl(result.audioUrl);
-            const thumbnail = toProxyUrl(result.metadata?.thumbnail) || '';
+            const downloadAbsolute = toAbsoluteUrl(result.downloadUrl);
+            const audioAbsolute = toAbsoluteUrl(result.audioUrl);
+            const thumbnailAbsolute = toAbsoluteUrl(result.metadata?.thumbnail);
+
+            const downloadUrl = toProxyUrl(downloadAbsolute);
+            const audioUrl = toProxyUrl(audioAbsolute);
+            const thumbnail = toProxyUrl(thumbnailAbsolute) || '';
 
             if (downloadUrl) {
                 const type = detectMediaType(downloadUrl);
