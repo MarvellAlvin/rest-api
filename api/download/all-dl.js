@@ -1,5 +1,5 @@
 // api/all-dl.js
-const { savefrom } = require('@bochilteam/scraper');
+const { igdl } = require('@zenaveline/scraper');
 
 /**
  * Deteksi platform dari URL (hanya untuk metadata)
@@ -15,12 +15,12 @@ function detectPlatform(url) {
 }
 
 /**
- * Normalisasi hasil dari savefrom ke format items
+ * Normalisasi hasil dari igdl ke format items
  */
-function normalizeSavefromResult(data) {
+function normalizeIgdlResult(data) {
     let items = [];
 
-    // Jika data berupa array (beberapa link)
+    // Jika data berupa array (beberapa media)
     if (Array.isArray(data)) {
         data.forEach(item => {
             if (item.url) {
@@ -33,7 +33,7 @@ function normalizeSavefromResult(data) {
                 });
             }
         });
-    } 
+    }
     // Jika data berupa objek tunggal
     else if (data && typeof data === 'object') {
         // Cek properti umum
@@ -64,7 +64,7 @@ function normalizeSavefromResult(data) {
 
     // Jika masih kosong, coba ambil dari properti 'result' atau 'data'
     if (items.length === 0 && data.result) {
-        return normalizeSavefromResult(data.result);
+        return normalizeIgdlResult(data.result);
     }
 
     return items;
@@ -92,11 +92,11 @@ module.exports = async (req, res) => {
     const platform = detectPlatform(url);
 
     try {
-        // Panggil savefrom
-        const rawResult = await savefrom(url);
+        // Panggil igdl dari @zenaveline/scraper
+        const rawResult = await igdl(url);
 
         // Normalisasi hasil
-        const items = normalizeSavefromResult(rawResult);
+        const items = normalizeIgdlResult(rawResult);
 
         // Jika tidak ada items, lempar error
         if (items.length === 0) {
