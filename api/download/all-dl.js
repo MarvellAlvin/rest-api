@@ -1,58 +1,65 @@
+// api/all-dl.js
 const axios = require('axios');
 
-const SOCIAL_DOWNLOADER_BASE = 'https://www.socialdownloader.space';
+// Gunakan public Cobalt API instance
+// PENTING: Instance ini memiliki rate limit dan proteksi bot.
+// Untuk penggunaan production, sangat disarankan untuk self-host Cobalt sendiri.
+// Panduan: https://github.com/imputnet/cobalt/blob/main/docs/run-an-instance.md
+const COBALT_API_URL = 'https://api.cobalt.tools/api/json';
 
 /**
- * Mengubah URL relatif menjadi absolut terhadap base socialdownloader
+ * Mendownload media menggunakan Cobalt API
+ * Dokumentasi: https://github.com/imputnet/cobalt/blob/main/docs/api.md
  */
-function toAbsoluteUrl(relativeUrl) {
-    if (!relativeUrl) return null;
+async function cobaltDownloader(url) {
     try {
-        new URL(relativeUrl);
-        return relativeUrl; // Sudah absolut
-    } catch {
-        return new URL(relativeUrl, SOCIAL_DOWNLOADER_BASE).href;
-    }
-}
-
-async function socialDownloader(url) {
-    try {
+        // Validasi URL
         if (!url.includes('https://')) {
             throw new Error('Invalid url. URL harus menggunakan HTTPS.');
         }
 
+        // Request ke Cobalt API
+        // Body: { url: "..." }
+        // Header: Accept: application/json, Content-Type: application/json
         const { data } = await axios.post(
-            `${SOCIAL_DOWNLOADER_BASE}/api/download`,
-            { url },
+            COBALT_API_URL,
+            { url: url },
             {
                 headers: {
+                    'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                    'User-Agent': 'Mozilla/5.0 (compatible; SocialDownloaderAPI/1.0)'
+                    'User-Agent': 'Mozilla/5.0 (compatible; CobaltDownloader/1.0)'
                 }
             }
         );
 
-        if (!data.success) {
-            throw new Error(data.error || 'Gagal mendapatkan data dari socialdownloader.space');
+        // Cek apakah Cobalt mengembalikan error
+        if (data.status === 'error') {
+            throw new Error(data.error?.message || 'Gagal memproses URL di Cobalt');
         }
 
-        return data;
+        // Cobalt mengembalikan { status: "tunnel", url: "..." } atau { status: "redirect", url: "..." }
+        // Kita akan mengambil URL download dari field 'url'
+        if (!data.url) {
+            throw new Error('Cobalt tidak mengembalikan URL download');
+        }
+
+        return {
+            success: true,
+            downloadUrl: data.url,
+            filename: data.filename || 'download',
+            // Cobalt tidak mengembalikan metadata seperti title/thumbnail secara langsung
+            // Tapi kita bisa mengambil dari response jika ada
+        };
     } catch (error) {
-        throw new Error(error.response?.data?.error || error.message);
+        // Tangani error dari Cobalt atau dari axios
+        throw new Error(error.response?.data?.error?.message || error.message);
     }
 }
 
 /**
- * Ubah URL absolut menjadi proxy internal kita
+ * Mendeteksi platform dari URL (hanya untuk informasi di metadata)
  */
-function toProxyUrl(absoluteUrl) {
-    if (!absoluteUrl) return null;
-    // Jika sudah berupa proxy kita, biarkan
-    if (absoluteUrl.startsWith('/api/proxy')) return absoluteUrl;
-    // Kirimkan ke endpoint proxy kita dengan url yang di-encode
-    return `/api/proxy?url=${encodeURIComponent(absoluteUrl)}`;
-}
-
 function detectPlatform(url) {
     const urlLower = url.toLowerCase();
     if (urlLower.includes('tiktok.com')) return 'tiktok';
@@ -60,25 +67,34 @@ function detectPlatform(url) {
     if (urlLower.includes('instagram.com')) return 'instagram';
     if (urlLower.includes('facebook.com') || urlLower.includes('fb.watch')) return 'facebook';
     if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) return 'youtube';
-    return null;
+    if (urlLower.includes('reddit.com')) return 'reddit';
+    if (urlLower.includes('soundcloud.com')) return 'soundcloud';
+    if (urlLower.includes('vimeo.com')) return 'vimeo';
+    if (urlLower.includes('pinterest.com')) return 'pinterest';
+    if (urlLower.includes('twitch.tv')) return 'twitch';
+    return 'unknown';
 }
 
+/**
+ * Mendeteksi tipe media dari URL (hanya untuk informasi di metadata)
+ */
 function detectMediaType(url) {
     if (!url) return 'video';
     const lower = url.toLowerCase();
     if (/\.(mp3|m4a|wav|ogg|aac|flac)\b/.test(lower) || /[?&]audio=1/.test(lower)) return 'audio';
     if (/\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|ico)\b/.test(lower)) return 'image';
     if (/\.(mp4|mov|webm|avi|mkv|flv|3gp|m4v)\b/.test(lower)) return 'video';
-    if (lower.includes('audio')) return 'audio';
-    if (lower.includes('image')) return 'image';
     return 'video';
 }
 
+// ===== Route Handler Express =====
 module.exports = async (req, res) => {
     const startTime = Date.now();
 
+    // Ambil parameter url dari query (GET) atau body (POST)
     const { url } = req.method === 'GET' ? req.query : req.body;
 
+    // Validasi URL
     if (!url) {
         return res.status(400).json({
             status: false,
@@ -90,72 +106,23 @@ module.exports = async (req, res) => {
         });
     }
 
+    // Deteksi platform untuk metadata
     const platform = detectPlatform(url);
-    if (!platform) {
-        return res.status(400).json({
-            status: false,
-            statusCode: 400,
-            author: '@velz',
-            error: 'URL tidak dikenali. Support: TikTok, Twitter/X, Instagram, Facebook, YouTube',
-            responseTimeMs: Date.now() - startTime,
-            timestamp: new Date().toISOString()
-        });
-    }
 
     try {
-        const result = await socialDownloader(url);
+        // Panggil Cobalt API
+        const result = await cobaltDownloader(url);
 
-        let items = [];
+        // Siapkan items array (Cobalt biasanya hanya mengembalikan 1 file)
+        const items = [{
+            title: result.filename || 'Media',
+            url: result.downloadUrl,
+            quality: 'Best',
+            thumbnail: '', // Cobalt tidak menyediakan thumbnail di response sederhana
+            type: detectMediaType(result.downloadUrl)
+        }];
 
-        // Jika ada images (carousel foto)
-        if (result.metadata?.images && result.metadata.images.length > 0) {
-            items = result.metadata.images.map((imgUrl, index) => {
-                const absoluteUrl = toAbsoluteUrl(imgUrl);
-                const proxyUrl = toProxyUrl(absoluteUrl);
-                return {
-                    title: result.metadata.title || `Image ${index + 1}`,
-                    url: proxyUrl,
-                    quality: 'Image',
-                    thumbnail: proxyUrl,
-                    type: 'image'
-                };
-            });
-        } else {
-            // Video atau audio
-            const downloadAbsolute = toAbsoluteUrl(result.downloadUrl);
-            const audioAbsolute = toAbsoluteUrl(result.audioUrl);
-            const thumbnailAbsolute = toAbsoluteUrl(result.metadata?.thumbnail);
-
-            const downloadUrl = toProxyUrl(downloadAbsolute);
-            const audioUrl = toProxyUrl(audioAbsolute);
-            const thumbnail = toProxyUrl(thumbnailAbsolute) || '';
-
-            if (downloadUrl) {
-                const type = detectMediaType(downloadUrl);
-                items.push({
-                    title: result.metadata?.title || 'Video',
-                    url: downloadUrl,
-                    quality: 'Video',
-                    thumbnail: thumbnail,
-                    type: type
-                });
-            }
-
-            if (audioUrl) {
-                items.push({
-                    title: (result.metadata?.title || 'Audio') + ' · Audio',
-                    url: audioUrl,
-                    quality: 'MP3 · Audio',
-                    thumbnail: thumbnail,
-                    type: 'audio'
-                });
-            }
-
-            if (items.length === 0) {
-                throw new Error('Tidak ada media yang dapat diunduh dari URL ini.');
-            }
-        }
-
+        // Format respons sesuai dengan yang kamu inginkan
         const response = {
             status: true,
             statusCode: 200,
@@ -163,9 +130,9 @@ module.exports = async (req, res) => {
             result: {
                 items: items,
                 metadata: {
-                    platform: result.metadata?.platform || platform,
-                    author: result.metadata?.author || '',
-                    title: result.metadata?.title || ''
+                    platform: platform,
+                    author: 'Unknown', // Cobalt tidak mengembalikan author
+                    title: result.filename || 'Media'
                 }
             },
             responseTimeMs: Date.now() - startTime,
@@ -174,6 +141,7 @@ module.exports = async (req, res) => {
 
         res.status(200).json(response);
     } catch (error) {
+        // Kirim respons error
         res.status(500).json({
             status: false,
             statusCode: 500,
