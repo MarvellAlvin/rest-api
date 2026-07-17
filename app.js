@@ -6,6 +6,10 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// === INI BARIS YANG DITAMBAHKAN ===
+app.set('json spaces', 2);  // Membuat output JSON lebih rapi dengan indentasi 2 spasi
+// ==================================
+
 // Middleware
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
@@ -18,14 +22,10 @@ function loadRoutes(dir, basePath = '') {
     const fullPath = path.join(dir, file);
     const stat = fs.statSync(fullPath);
     if (stat.isDirectory()) {
-      // Rekursif ke subfolder
       loadRoutes(fullPath, path.join(basePath, file));
     } else if (file.endsWith('.js')) {
-      // Ambil nama file tanpa ekstensi
       const routeName = path.basename(file, '.js');
-      // Gabungkan basePath dan routeName, contoh: downloader/tiktok
       const routePath = path.join(basePath, routeName);
-      // Register route
       const handler = require(fullPath);
       app.use(`/api/${routePath}`, handler);
       console.log(`Route registered: /api/${routePath}`);
