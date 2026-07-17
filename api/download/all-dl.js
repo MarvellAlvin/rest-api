@@ -1,139 +1,120 @@
+// api/all-dl.js
 const axios = require('axios');
-
-// Daftar instance Cobalt API (public & alternatif)
-const COBALT_INSTANCES = [
-    'https://api.cobalt.tools',
-    'https://cobalt-api.vercel.app',
-    'https://cobalt-api.onrender.com'
-];
-
-// Proxy CORS eksternal sebagai fallback terakhir
-const CORS_PROXY = 'https://cors.siputzx.my.id/url?url=';
-
-/**
- * Mendownload media menggunakan Cobalt API dengan fallback
- */
-async function cobaltDownloader(url) {
-    // Coba setiap instance Cobalt secara bergantian
-    for (const baseUrl of COBALT_INSTANCES) {
-        try {
-            const requestUrl = `${baseUrl}/api/json`;
-            const { data } = await axios.post(
-                requestUrl,
-                { url: url },
-                {
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7',
-                        'Origin': 'https://cobalt.tools',
-                        'Referer': 'https://cobalt.tools/'
-                    },
-                    // Timeout agar tidak terlalu lama
-                    timeout: 15000
-                }
-            );
-
-            // Jika Cobalt mengembalikan error
-            if (data.status === 'error') {
-                throw new Error(data.error?.message || 'Cobalt error');
-            }
-            if (!data.url) {
-                throw new Error('Tidak ada URL download dari Cobalt');
-            }
-
-            // Sukses
-            return {
-                success: true,
-                downloadUrl: data.url,
-                filename: data.filename || 'download'
-            };
-        } catch (error) {
-            // Jika error 400/403 (bot protection), coba instance berikutnya
-            if (error.response?.status === 400 || error.response?.status === 403) {
-                continue;
-            }
-            // Jika error lain (timeout, network), coba instance berikutnya juga
-            if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-                continue;
-            }
-            // Jika error lain yang tidak terduga, lempar agar ditangani di akhir
-            throw error;
-        }
-    }
-
-    // Jika semua instance gagal, coba melalui proxy eksternal
-    // (agar bisa melewati bot protection)
-    try {
-        const proxyUrl = CORS_PROXY + encodeURIComponent(`${COBALT_INSTANCES[0]}/api/json`);
-        const { data } = await axios.post(
-            proxyUrl,
-            { url: url },
-            {
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                },
-                timeout: 20000
-            }
-        );
-
-        if (data.status === 'error') {
-            throw new Error(data.error?.message || 'Proxy Cobalt error');
-        }
-        if (!data.url) {
-            throw new Error('Tidak ada URL download dari proxy');
-        }
-
-        return {
-            success: true,
-            downloadUrl: data.url,
-            filename: data.filename || 'download'
-        };
-    } catch (error) {
-        // Jika semua upaya gagal, lempar error terakhir
-        throw new Error('Semua upaya gagal: ' + error.message);
-    }
-}
+const {
+    savefrom,
+    youtube,
+    tiktok,
+    instagram,
+    twitter,
+    facebook
+} = require('@bochilteam/scraper');
 
 /**
  * Deteksi platform dari URL
  */
 function detectPlatform(url) {
-    const urlLower = url.toLowerCase();
-    if (urlLower.includes('tiktok.com')) return 'tiktok';
-    if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) return 'twitter';
-    if (urlLower.includes('instagram.com')) return 'instagram';
-    if (urlLower.includes('facebook.com') || urlLower.includes('fb.watch')) return 'facebook';
-    if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) return 'youtube';
-    if (urlLower.includes('reddit.com')) return 'reddit';
-    if (urlLower.includes('soundcloud.com')) return 'soundcloud';
-    if (urlLower.includes('vimeo.com')) return 'vimeo';
-    if (urlLower.includes('pinterest.com')) return 'pinterest';
-    if (urlLower.includes('twitch.tv')) return 'twitch';
+    const lower = url.toLowerCase();
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
+    if (lower.includes('tiktok.com')) return 'tiktok';
+    if (lower.includes('instagram.com')) return 'instagram';
+    if (lower.includes('twitter.com') || lower.includes('x.com')) return 'twitter';
+    if (lower.includes('facebook.com') || lower.includes('fb.watch')) return 'facebook';
     return 'unknown';
 }
 
 /**
- * Deteksi tipe media dari URL
+ * Pilih scraper berdasarkan platform
  */
-function detectMediaType(url) {
-    if (!url) return 'video';
-    const lower = url.toLowerCase();
-    if (/\.(mp3|m4a|wav|ogg|aac|flac)\b/.test(lower) || /[?&]audio=1/.test(lower)) return 'audio';
-    if (/\.(jpg|jpeg|png|webp|gif|bmp|svg|tiff|ico)\b/.test(lower)) return 'image';
-    if (/\.(mp4|mov|webm|avi|mkv|flv|3gp|m4v)\b/.test(lower)) return 'video';
-    return 'video';
+async function getScraper(url, platform) {
+    switch (platform) {
+        case 'youtube':
+            return await youtube(url);
+        case 'tiktok':
+            return await tiktok(url);
+        case 'instagram':
+            return await instagram(url);
+        case 'twitter':
+            return await twitter(url);
+        case 'facebook':
+            return await facebook(url);
+        default:
+            // Fallback ke savefrom untuk platform lain
+            return await savefrom(url);
+    }
+}
+
+/**
+ * Normalisasi hasil scraper ke format items
+ */
+function normalizeResult(data, platform) {
+    let items = [];
+
+    // Cek apakah data memiliki properti 'url' (video tunggal)
+    if (data.url) {
+        items.push({
+            title: data.title || 'Media',
+            url: data.url,
+            quality: data.quality || 'Best',
+            thumbnail: data.thumbnail || '',
+            type: 'video'
+        });
+    }
+
+    // Cek jika ada 'urls' (array of videos)
+    if (data.urls && Array.isArray(data.urls)) {
+        data.urls.forEach(item => {
+            items.push({
+                title: item.title || data.title || 'Media',
+                url: item.url,
+                quality: item.quality || 'Best',
+                thumbnail: item.thumbnail || data.thumbnail || '',
+                type: 'video'
+            });
+        });
+    }
+
+    // Cek jika ada 'audio' (audio stream)
+    if (data.audio) {
+        items.push({
+            title: (data.title || 'Audio') + ' · Audio',
+            url: data.audio,
+            quality: 'MP3 · Audio',
+            thumbnail: data.thumbnail || '',
+            type: 'audio'
+        });
+    }
+
+    // Jika masih kosong, coba ambil dari properti lain
+    if (items.length === 0) {
+        // Coba ambil dari 'result' atau 'data'
+        const result = data.result || data.data || data;
+        if (typeof result === 'object' && result !== null) {
+            for (const key of ['url', 'downloadUrl', 'link', 'videoUrl', 'audioUrl']) {
+                if (result[key]) {
+                    items.push({
+                        title: result.title || 'Media',
+                        url: result[key],
+                        quality: 'Best',
+                        thumbnail: result.thumbnail || '',
+                        type: key.includes('audio') ? 'audio' : 'video'
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    return items;
 }
 
 // ===== Route Handler Express =====
 module.exports = async (req, res) => {
     const startTime = Date.now();
 
+    // Ambil url dari query atau body
     const { url } = req.method === 'GET' ? req.query : req.body;
 
+    // Validasi
     if (!url) {
         return res.status(400).json({
             status: false,
@@ -145,19 +126,27 @@ module.exports = async (req, res) => {
         });
     }
 
+    // Deteksi platform
     const platform = detectPlatform(url);
 
     try {
-        const result = await cobaltDownloader(url);
+        // Panggil scraper yang sesuai
+        const rawResult = await getScraper(url, platform);
 
-        const items = [{
-            title: result.filename || 'Media',
-            url: result.downloadUrl,
-            quality: 'Best',
-            thumbnail: '',
-            type: detectMediaType(result.downloadUrl)
-        }];
+        // Normalisasi hasil
+        const items = normalizeResult(rawResult, platform);
 
+        // Jika tidak ada items, lempar error
+        if (items.length === 0) {
+            throw new Error('Tidak ada media yang ditemukan dari URL ini.');
+        }
+
+        // Ambil metadata
+        const firstItem = items[0];
+        const title = firstItem.title || 'Media';
+        const thumbnail = firstItem.thumbnail || '';
+
+        // Format response
         const response = {
             status: true,
             statusCode: 200,
@@ -167,7 +156,7 @@ module.exports = async (req, res) => {
                 metadata: {
                     platform: platform,
                     author: 'Unknown',
-                    title: result.filename || 'Media'
+                    title: title
                 }
             },
             responseTimeMs: Date.now() - startTime,
@@ -176,6 +165,35 @@ module.exports = async (req, res) => {
 
         res.status(200).json(response);
     } catch (error) {
+        // Jika error, coba fallback ke savefrom (untuk platform yang tidak didukung)
+        if (platform === 'unknown') {
+            try {
+                const fallbackResult = await savefrom(url);
+                const fallbackItems = normalizeResult(fallbackResult, 'savefrom');
+                if (fallbackItems.length > 0) {
+                    const response = {
+                        status: true,
+                        statusCode: 200,
+                        author: '@velz',
+                        result: {
+                            items: fallbackItems,
+                            metadata: {
+                                platform: 'savefrom',
+                                author: 'Unknown',
+                                title: fallbackItems[0]?.title || 'Media'
+                            }
+                        },
+                        responseTimeMs: Date.now() - startTime,
+                        timestamp: new Date().toISOString()
+                    };
+                    return res.status(200).json(response);
+                }
+            } catch (fallbackError) {
+                // Jika fallback juga gagal, lanjut ke error utama
+            }
+        }
+
+        // Kirim error
         res.status(500).json({
             status: false,
             statusCode: 500,
