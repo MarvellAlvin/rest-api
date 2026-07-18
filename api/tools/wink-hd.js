@@ -2,9 +2,9 @@
 const axios = require('axios');
 const FormData = require('form-data');
 const crypto = require('crypto');
+const path = require('path');
 const { CookieJar } = require('tough-cookie');
 const { wrapper } = require('axios-cookiejar-support');
-const { URL } = require('url');
 
 const BASE_URL = 'https://wink.ai';
 const STRATEGY_URL = 'https://strategy.app.meitudata.com';
@@ -78,9 +78,6 @@ function baseParams(extra = {}) {
   });
 }
 
-/**
- * Buat instance axios dengan cookie jar
- */
 function createApiInstance(gnum) {
   const jar = new CookieJar();
   jar.setCookieSync(`_sm=${gnum}; Path=/; Domain=wink.ai`, BASE_URL);
@@ -115,21 +112,17 @@ function createApiInstance(gnum) {
 }
 
 async function enhanceImage(imageUrl) {
-  // Generate unique ID untuk session
   const gnum = generateGNUM();
   globalThis._gnum = gnum;
   const api = createApiInstance(gnum);
 
-  // 1. Download gambar dari URL
+  // Download gambar dari URL
   const imageResponse = await axios.get(imageUrl, {
     responseType: 'arraybuffer',
-    headers: {
-      'User-Agent': UA
-    }
+    headers: { 'User-Agent': UA }
   });
   const imageBuffer = Buffer.from(imageResponse.data);
 
-  // Ekstrak nama file dari URL
   const urlObj = new URL(imageUrl);
   let filename = path.basename(urlObj.pathname);
   if (!filename || !filename.includes('.')) {
@@ -141,7 +134,7 @@ async function enhanceImage(imageUrl) {
     filename += '.jpg';
   }
 
-  // 2. Dapatkan sign
+  // 1. get_maat_sign
   const signRes = await api.get(
     `/api/file/get_maat_sign.json?${baseParams({
       suffix: fileSuffix(filename),
@@ -155,7 +148,7 @@ async function enhanceImage(imageUrl) {
   }
   const sign = signRes.data.data;
 
-  // 3. Dapatkan upload policy
+  // 2. upload policy
   const policyParams = new URLSearchParams({
     app: sign.app,
     count: String(sign.count),
@@ -189,7 +182,7 @@ async function enhanceImage(imageUrl) {
   }
   const policy = policyRes.data[0].qiniu;
 
-  // 4. Upload ke Qiniu (dari buffer)
+  // 3. upload ke qiniu
   const form = new FormData();
   form.append('file', imageBuffer, {
     filename: filename,
@@ -221,8 +214,8 @@ async function enhanceImage(imageUrl) {
   const fileKey = policy.key;
   const sourceUrl = uploadRes.data.url || uploadRes.data.data || policy.data;
 
-  // 5. Meta info
-  const metaRes = await api.post(
+  // 4. meta info
+  await api.post(
     `/api/file/meta_info.json`,
     baseParams({ file_key: fileKey }).toString(),
     {
@@ -232,11 +225,8 @@ async function enhanceImage(imageUrl) {
       }
     }
   );
-  if (metaRes.status >= 400 || metaRes.data?.code !== 0) {
-    throw new Error(`meta info gagal: ${JSON.stringify(metaRes.data)}`);
-  }
 
-  // 6. Calc beans
+  // 5. calc beans
   const typeParams = JSON.stringify({
     is_mirror: 0,
     orientation_tag: 1,
@@ -260,7 +250,7 @@ async function enhanceImage(imageUrl) {
       right_detail: rightDetail
     }
   ]);
-  const calcRes = await api.post(
+  await api.post(
     `/api/subscribe/batch_calc_need_beans.json`,
     baseParams({ item_list: itemList }).toString(),
     {
@@ -270,11 +260,8 @@ async function enhanceImage(imageUrl) {
       }
     }
   );
-  if (calcRes.status >= 400 || calcRes.data?.code !== 0) {
-    throw new Error(`calc beans gagal: ${JSON.stringify(calcRes.data)}`);
-  }
 
-  // 7. Delivery
+  // 6. delivery
   const taskName = `Enhancer-Ultra HD-${filename}`;
   const deliveryBody = baseParams({
     type: TASK_TYPE,
@@ -307,7 +294,7 @@ async function enhanceImage(imageUrl) {
     throw new Error(`delivery tidak mengembalikan msg_id: ${JSON.stringify(taskData)}`);
   }
 
-  // 8. Polling hasil
+  // 7. polling hasil
   let msgId = firstMsgId;
   let lastData = null;
   const maxTry = 80;
@@ -330,7 +317,6 @@ async function enhanceImage(imageUrl) {
     const data = queryRes.data.data;
     lastData = data;
 
-    // Cari next msg id
     const item = data?.item_list?.[0];
     const resultValue = item?.result?.result || '';
     const realMsgId = item?.result?.msg_id || item?.msg_id || '';
@@ -356,7 +342,6 @@ async function enhanceImage(imageUrl) {
       continue;
     }
 
-    // Cek hasil URL
     const media = item?.result?.media_info_list?.[0];
     const resultUrl = media?.media_data || '';
     const errorCode = item?.result?.error_code;
@@ -394,13 +379,10 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Validasi URL
-    new URL(url); // cek valid
-
-    // Proses enhance
+    new URL(url);
     const resultUrl = await enhanceImage(url);
 
-    const response = {
+    res.status(200).json({
       status: true,
       statusCode: 200,
       author: '@velz',
@@ -410,9 +392,7 @@ module.exports = async (req, res) => {
       },
       responseTimeMs: Date.now() - startTime,
       timestamp: new Date().toISOString()
-    };
-
-    res.status(200).json(response);
+    });
   } catch (error) {
     console.error('[Wink-HD] Error:', error.message);
     res.status(500).json({
