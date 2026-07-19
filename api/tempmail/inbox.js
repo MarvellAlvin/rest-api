@@ -1,24 +1,52 @@
 // api/tempmail/inbox.js
-const TempmailV3 = require('../../services/tempmail');
+const Tempmail = require('../../services/tempmail');
 
 module.exports = async (req, res) => {
     const startTime = Date.now();
-    const { visitorId } = req.method === 'GET' ? req.query : req.body;
 
-    if (!visitorId) {
+    const { email, readId } = req.method === 'GET' ? req.query : req.body;
+
+    if (!email) {
         return res.status(400).json({
             status: false,
             statusCode: 400,
             author: '@velz',
-            error: 'Parameter "visitorId" wajib diisi (didapat dari generate).',
+            error: 'Parameter "email" wajib diisi.',
+            responseTimeMs: Date.now() - startTime,
+            timestamp: new Date().toISOString()
+        });
+    }
+
+    // Validasi format email
+    if (!email.includes('@') || !email.split('@')[1]) {
+        return res.status(400).json({
+            status: false,
+            statusCode: 400,
+            author: '@velz',
+            error: 'Format email tidak valid.',
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
         });
     }
 
     try {
-        const tempmail = new TempmailV3();
-        const messages = await tempmail.inbox(visitorId);
+        const tempmail = new Tempmail();
+
+        // Jika ada readId, baca detail pesan
+        if (readId) {
+            const detail = await tempmail.readMessage(email, readId);
+            return res.status(200).json({
+                status: true,
+                statusCode: 200,
+                author: '@velz',
+                result: detail,
+                responseTimeMs: Date.now() - startTime,
+                timestamp: new Date().toISOString()
+            });
+        }
+
+        // Ambil daftar pesan
+        const messages = await tempmail.inbox(email);
 
         if (!messages || messages.length === 0) {
             return res.status(200).json({
@@ -26,9 +54,10 @@ module.exports = async (req, res) => {
                 statusCode: 200,
                 author: '@velz',
                 result: {
+                    email,
                     messages: [],
                     total: 0,
-                    note: 'Belum ada pesan masuk. Coba kirim email ke alamat yang di-generate.'
+                    note: 'Belum ada pesan masuk. Coba kirim email ke alamat ini.'
                 },
                 responseTimeMs: Date.now() - startTime,
                 timestamp: new Date().toISOString()
@@ -40,8 +69,10 @@ module.exports = async (req, res) => {
             statusCode: 200,
             author: '@velz',
             result: {
+                email,
                 messages: messages,
-                total: messages.length
+                total: messages.length,
+                hint: 'Gunakan parameter "readId" dengan ID pesan untuk membaca detail.'
             },
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
