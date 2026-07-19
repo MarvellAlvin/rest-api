@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Velz API Playground</title>
+
+    <!-- Font & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
+
+    <style>
+        /* --- Reset & Base --- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0b0e14;
+            color: #e8edf5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        /* --- Header --- */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 16px 0 24px;
+            border-bottom: 1px solid #1e2633;
+            margin-bottom: 28px;
+        }
+        .logo h1 {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #7aa2f7, #c0a8ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .logo span {
+            font-size: 13px;
+            color: #6b7a93;
+            font-weight: 400;
+            -webkit-text-fill-color: #6b7a93;
+            display: block;
+            margin-top: 2px;
+        }
+        .badge {
+            background: #1e2633;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #7aa2f7;
+            border: 1px solid #2d3748;
+        }
+
+        /* --- Stats --- */
+        .stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px 32px;
+            background: #121821;
+            padding: 16px 24px;
+            border-radius: 16px;
+            border: 1px solid #1e2633;
+            margin-bottom: 28px;
+        }
+        .stats-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #9aaec9;
+        }
+        .stats-item strong {
+            color: #e8edf5;
+            font-weight: 600;
+        }
+        .stats-item .material-icons {
+            font-size: 18px;
+            color: #7aa2f7;
+        }
+
+        /* --- Layout --- */
+        .two-col {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 28px;
+        }
+        @media (max-width: 820px) {
+            .two-col {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            background: #121821;
+            border-radius: 20px;
+            border: 1px solid #1e2633;
+            padding: 20px 0;
+            max-height: 75vh;
+            overflow-y: auto;
+            position: sticky;
+            top: 20px;
+        }
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #2d3748;
+            border-radius: 10px;
+        }
+        .sidebar-title {
+            padding: 0 20px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #6b7a93;
+        }
+        .endpoint-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: 0.15s;
+            border-left: 3px solid transparent;
+            font-size: 13px;
+            color: #c0d0e5;
+        }
+        .endpoint-item:hover {
+            background: #1a232f;
+            color: #e8edf5;
+        }
+        .endpoint-item.active {
+            background: #1a232f;
+            border-left-color: #7aa2f7;
+            color: #e8edf5;
+        }
+        .method-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 6px;
+            flex-shrink: 0;
+            letter-spacing: 0.3px;
+        }
+        .method-badge.get {
+            background: #0d3b4f;
+            color: #5fc3e4;
+        }
+        .method-badge.post {
+            background: #1f3a2a;
+            color: #6fcf97;
+        }
+        .method-badge.put {
+            background: #3d2e1a;
+            color: #f5a623;
+        }
+        .method-badge.delete {
+            background: #3d1a1a;
+            color: #f26b6b;
+        }
+        .endpoint-path {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            word-break: break-all;
+            flex: 1;
+        }
+        .endpoint-desc {
+            font-size: 11px;
+            color: #6b7a93;
+            display: block;
+            margin-top: 2px;
+        }
+
+        /* --- Main Panel --- */
+        .panel {
+            background: #121821;
+            border-radius: 20px;
+            border: 1px solid #1e2633;
+            padding: 24px 28px;
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 12px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #1e2633;
+            margin-bottom: 24px;
+        }
+        .panel-header h2 {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        .panel-header .sub {
+            color: #9aaec9;
+            font-size: 14px;
+            font-weight: 400;
+            margin-top: 4px;
+        }
+
+        /* --- Form --- */
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #c0d0e5;
+            margin-bottom: 5px;
+        }
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            background: #0b0e14;
+            border: 1px solid #1e2633;
+            border-radius: 12px;
+            color: #e8edf5;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            transition: 0.15s;
+            outline: none;
+        }
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #7aa2f7;
+            box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.15);
+        }
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+            font-family: 'Inter', sans-serif;
+        }
+        .form-group .hint {
+            font-size: 12px;
+            color: #6b7a93;
+            margin-top: 4px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        @media (max-width: 600px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* --- Buttons --- */
+        .btn {
+            padding: 10px 28px;
+            border: none;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Inter', sans-serif;
+        }
+        .btn-primary {
+            background: #7aa2f7;
+            color: #0b0e14;
+        }
+        .btn-primary:hover {
+            background: #8fb4ff;
+            transform: scale(0.97);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-secondary {
+            background: #1e2633;
+            color: #c0d0e5;
+        }
+        .btn-secondary:hover {
+            background: #2d3748;
+        }
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 8px;
+        }
+
+        /* --- Response --- */
+        .response-area {
+            margin-top: 24px;
+            border-top: 1px solid #1e2633;
+            padding-top: 20px;
+        }
+        .response-area .label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #9aaec9;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+        .response-area .label .status-badge {
+            font-size: 11px;
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        .status-badge.success {
+            background: #1f3a2a;
+            color: #6fcf97;
+        }
+        .status-badge.error {
+            background: #3d1a1a;
+            color: #f26b6b;
+        }
+        .status-badge.loading {
+            background: #1a2a3d;
+            color: #5fc3e4;
+        }
+        .response-body {
+            background: #0b0e14;
+            border-radius: 14px;
+            padding: 16px 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #1a232f;
+            color: #c0d0e5;
+            line-height: 1.6;
+        }
+        .response-body .key {
+            color: #7aa2f7;
+        }
+        .response-body .string {
+            color: #a8d08d;
+        }
+        .response-body .number {
+            color: #f5a623;
+        }
+        .response-body .boolean {
+            color: #f26b6b;
+        }
+        .response-body .null {
+            color: #6b7a93;
+        }
+
+        /* --- Empty state --- */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7a93;
+        }
+        .empty-state .material-icons {
+            font-size: 48px;
+            color: #2d3748;
+            margin-bottom: 12px;
+        }
+        .empty-state p {
+            font-size: 14px;
+        }
+
+        /* --- Footer --- */
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 13px;
+            color: #4a5a72;
+            border-top: 1px solid #1e2633;
+            padding-top: 24px;
+        }
+        .footer a {
+            color: #7aa2f7;
+            text-decoration: none;
+        }
+
+        /* --- Scrollbar --- */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b0e14;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3748;
+            border-radius: 10px;
+        }
+
+        /* --- Animasi loading dots --- */
+        .dots::after {
+            content: '';
+            animation: dots 1.2s steps(4, end) infinite;
+        }
+        @keyframes dots {
+            0% {
+                content: '';
+            }
+            25% {
+                content: '.';
+            }
+            50% {
+                content: '..';
+            }
+            75% {
+                content: '...';
+            }
+            100% {
+                content: '';
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+
+        <!-- HEADER -->
+        <header class="header">
+            <div class="logo">
+                <h1>⚡ Velz API Playground</h1>
+                <span>Free Public REST API — No API Key Required</span>
+            </div>
+            <div class="badge">🚀 v1.0.0</div>
+        </header>
+
+        <!-- STATS -->
+        <div class="stats" id="statsBar">
+            <div class="stats-item">
+                <span class="material-icons">hub</span>
+                <span>Total Endpoints: <strong id="totalEndpoints">0</strong></span>
+            </div>
+            <div class="stats-item">
+                <span class="material-icons">check_circle</span>
+                <span>Status: <strong style="color:#6fcf97;">● Online</strong></span>
+            </div>
+            <div class="stats-item">
+                <span class="material-icons">schedule</span>
+                <span>Response: <strong id="lastResponse">—</strong></span>
+            </div>
+        </div>
+
+        <!-- MAIN -->
+        <div class="two-col">
+
+            <!-- SIDEBAR -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-title">📂 Endpoints</div>
+                <div id="endpointList">
+                    <!-- Diisi oleh JavaScript -->
+                </div>
+            </aside>
+
+            <!-- PANEL -->
+            <main class="panel" id="panel">
+                <div class="panel-header">
+                    <div>
+                        <h2 id="panelTitle">Pilih Endpoint</h2>
+                        <div class="sub" id="panelSub">Klik salah satu endpoint di sidebar untuk mulai testing</div>
+                    </div>
+                    <div id="panelMethod" style="font-size:13px;color:#6b7a93;"></div>
+                </div>
+
+                <div id="panelContent">
+                    <div class="empty-state">
+                        <span class="material-icons">play_arrow</span>
+                        <p>Pilih endpoint dari daftar di samping kiri</p>
+                    </div>
+                </div>
+            </main>
+
+        </div>
+
+        <footer class="footer">
+            Built with ❤️ by <a href="#">@velz</a> &middot; Base URL: <code style="background:#1a232f;padding:2px 10px;border-radius:6px;font-size:12px;">https://rest-api-murex-delta.vercel.app</code>
+        </footer>
+
+    </div>
+
+    <script>
+        // ================================================================
+        //  KONFIGURASI ENDPOINT
+        // ================================================================
+        const BASE_URL = 'https://rest-api-murex-delta.vercel.app';
+
+        const ENDPOINTS = [{
+            id: 'web2apk',
+            category: 'Tools',
+            method: 'POST',
+            path: '/api/tools/web2apk',
+            description: 'Ubah website menjadi APK',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://example.com' },
+                { name: 'appName', type: 'text', required: true, placeholder: 'MyApp' },
+                { name: 'versionName', type: 'text', required: false, placeholder: '1.0.0' },
+                { name: 'versionCode', type: 'text', required: false, placeholder: '1' },
+            ],
+            isFormData: true,
+            fileField: 'icon'
+        }, {
+            id: 'shorturl',
+            category: 'Tools',
+            method: 'GET',
+            path: '/api/tools/shorturl',
+            description: 'Perpendek URL menggunakan TinyURL',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://example.com/very-long-url' }
+            ]
+        }, {
+            id: 'play-yt',
+            category: 'Tools',
+            method: 'GET',
+            path: '/api/tools/play-yt',
+            description: 'Cari & download audio/video YouTube',
+            params: [
+                { name: 'query', type: 'text', required: true, placeholder: 'judul lagu atau URL YouTube' },
+                { name: 'type', type: 'select', required: false, options: ['audio', 'video'], default: 'audio' }
+            ]
+        }, {
+            id: 'obf',
+            category: 'Tools',
+            method: 'POST',
+            path: '/api/tools/obf',
+            description: 'Obfuscate JavaScript code',
+            params: [
+                { name: 'code', type: 'textarea', required: true, placeholder: 'console.log("Hello");' },
+                { name: 'level', type: 'select', required: false, options: ['low', 'medium', 'high'], default: 'medium' }
+            ]
+        }, {
+            id: 'ilovepdf',
+            category: 'Tools',
+            method: 'POST',
+            path: '/api/tools/ilovepdf',
+            description: 'Manipulasi PDF (compress, convert, dll)',
+            params: [
+                { name: 'action', type: 'select', required: true, options: ['compress', 'image-to-pdf', 'pdf-to-image',
+                        'word-to-pdf', 'pdf-to-word', 'ppt-to-pdf', 'pdf-to-ppt'
+                    ] },
+            ],
+            isFormData: true,
+            fileField: 'file'
+        }, {
+            id: 'iloveimg',
+            category: 'Tools',
+            method: 'POST',
+            path: '/api/tools/iloveimg',
+            description: 'Edit gambar (remove bg, upscale, resize)',
+            params: [
+                { name: 'action', type: 'select', required: true, options: ['remove-bg', 'upscale', 'resize'] },
+                { name: 'multiplier', type: 'text', required: false, placeholder: '2 (upscale)' },
+                { name: 'width', type: 'text', required: false, placeholder: '800 (resize)' },
+                { name: 'height', type: 'text', required: false, placeholder: '600 (resize)' },
+                { name: 'percentage', type: 'text', required: false, placeholder: '50 (resize)' },
+            ],
+            isFormData: true,
+            fileField: 'file'
+        }, {
+            id: 'domain-finder',
+            category: 'Tools',
+            method: 'GET',
+            path: '/api/tools/domain-finder',
+            description: 'Cari sertifikat SSL dari crt.sh',
+            params: [
+                { name: 'domain', type: 'text', required: true, placeholder: 'example.com' }
+            ]
+        }, {
+            id: 'detikcom',
+            category: 'Search',
+            method: 'GET',
+            path: '/api/search/detikcom',
+            description: 'Cari berita di Detik.com',
+            params: [
+                { name: 'query', type: 'text', required: true, placeholder: 'iran' },
+                { name: 'content', type: 'select', required: false, options: ['false', 'true'], default: 'false' }
+            ]
+        }, {
+            id: 'google',
+            category: 'Search',
+            method: 'GET',
+            path: '/api/search/google',
+            description: 'Google Dork generator',
+            params: [
+                { name: 'domain', type: 'text', required: true, placeholder: 'example.com' },
+                { name: 'feature', type: 'select', required: true, options: ['backup', 'login', 'documents',
+                        'wordpress', 'sql-errors', 'phpinfo', 'subdomains', 'github', 'shodan', 'reddit'
+                    ] }
+            ]
+        }, {
+            id: 'playstore',
+            category: 'Search',
+            method: 'GET',
+            path: '/api/search/playstore',
+            description: 'Cari aplikasi di Google Play Store',
+            params: [
+                { name: 'query', type: 'text', required: true, placeholder: 'whatsapp' },
+                { name: 'limit', type: 'text', required: false, placeholder: '10' }
+            ]
+        }, {
+            id: 'puisi',
+            category: 'Search',
+            method: 'GET',
+            path: '/api/search/puisi',
+            description: 'Cari pantun di pantunis.com',
+            params: [
+                { name: 'kata', type: 'text', required: true, placeholder: 'pahlawan' }
+            ]
+        }, {
+            id: 'jadwal-bola',
+            category: 'Search',
+            method: 'GET',
+            path: '/api/search/jadwal-bola',
+            description: 'Jadwal pertandingan sepak bola',
+            params: [
+                { name: 'date', type: 'text', required: false, placeholder: '20260719 (YYYYMMDD)' },
+                { name: 'timezone', type: 'text', required: false, placeholder: 'Asia/Jakarta' }
+            ]
+        }, {
+            id: 'tiktok',
+            category: 'Search',
+            method: 'GET',
+            path: '/api/search/tiktok',
+            description: 'Cari video TikTok',
+            params: [
+                { name: 'query', type: 'text', required: true, placeholder: 'meme' },
+                { name: 'page', type: 'text', required: false, placeholder: '1' }
+            ]
+        }, {
+            id: 'wikipedia',
+            category: 'Search',
+            method: 'GET',
+            path: '/api/search/wikipedia',
+            description: 'Cari artikel di Wikipedia',
+            params: [
+                { name: 'query', type: 'text', required: true, placeholder: 'nodejs' },
+                { name: 'limit', type: 'text', required: false, placeholder: '10' }
+            ]
+        }, {
+            id: 'youtube',
+            category: 'Search',
+            method: 'GET',
+            path: '/api/search/youtube',
+            description: 'Cari video di YouTube',
+            params: [
+                { name: 'query', type: 'text', required: true, placeholder: 'nodejs tutorial' },
+                { name: 'limit', type: 'text', required: false, placeholder: '10' }
+            ]
+        }, {
+            id: 'youtube-dl',
+            category: 'Download',
+            method: 'GET',
+            path: '/api/download/youtube',
+            description: 'Download audio/video YouTube (ytdl-core)',
+            params: [
+                { name: 'url', type: 'text', required: false, placeholder: 'https://youtu.be/...' },
+                { name: 'query', type: 'text', required: false, placeholder: 'atau cari dengan judul' },
+                { name: 'type', type: 'select', required: false, options: ['audio', 'video'], default: 'audio' }
+            ]
+        }, {
+            id: 'instagram',
+            category: 'Download',
+            method: 'GET',
+            path: '/api/download/instagram',
+            description: 'Download Instagram Reel/Post',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://www.instagram.com/reel/...' }
+            ]
+        }, {
+            id: 'tiktok-dl',
+            category: 'Download',
+            method: 'GET',
+            path: '/api/download/tiktok',
+            description: 'Download TikTok video (no watermark)',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://www.tiktok.com/@.../video/...' }
+            ]
+        }, {
+            id: 'snapsaver',
+            category: 'Download',
+            method: 'GET',
+            path: '/api/download/snapsaver',
+            description: 'Download dari berbagai platform (TikTok, IG, Twitter, dll)',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://vt.tiktok.com/...' }
+            ]
+        }, {
+            id: 'instasave',
+            category: 'Download',
+            method: 'GET',
+            path: '/api/download/instasave',
+            description: 'Download Instagram Story/DP/Post (dengan username)',
+            params: [
+                { name: 'username', type: 'text', required: true, placeholder: 'ryleearnold1' },
+                { name: 'type', type: 'select', required: false, options: ['story', 'dp', 'media'], default: 'story' }
+            ]
+        }, {
+            id: 'all-dl',
+            category: 'Download',
+            method: 'GET',
+            path: '/api/download/all',
+            description: 'Universal downloader (YouTube, TikTok, IG, Twitter, FB, Pinterest)',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://www.tiktok.com/@.../video/...' }
+            ]
+        }, {
+            id: 'free-views-tt',
+            category: 'Download',
+            method: 'GET',
+            path: '/api/tools/free-views-tt',
+            description: 'Tambah 100 views gratis TikTok (butuh apikey)',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://www.tiktok.com/@.../video/...' },
+                { name: 'apikey', type: 'text', required: true, placeholder: 'fgsiapi-xxx' }
+            ]
+        }, {
+            id: 'amprem',
+            category: 'Tools',
+            method: 'GET',
+            path: '/api/tools/amprem',
+            description: 'Buat akun Alight Motion Premium',
+            params: [
+                { name: 'limit', type: 'text', required: false, placeholder: '1 (maks 5)' }
+            ]
+        }, {
+            id: 'wink-hd',
+            category: 'Tools',
+            method: 'GET',
+            path: '/api/tools/wink-hd',
+            description: 'Tingkatkan kualitas gambar ke HD (URL)',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://example.com/image.jpg' }
+            ]
+        }, {
+            id: 'rumahotp',
+            category: 'OTP',
+            method: 'GET',
+            path: '/api/otp/rumahotp',
+            description: 'Kirim OTP WhatsApp Rumah123',
+            params: [
+                { name: 'number', type: 'text', required: true, placeholder: '08123456789' },
+                { name: 'limit', type: 'text', required: false, placeholder: '1' }
+            ]
+        }, {
+            id: 'otp-services',
+            category: 'OTP',
+            method: 'GET',
+            path: '/api/otp/services',
+            description: 'Daftar layanan OTP NumberPanel',
+            params: []
+        }, {
+            id: 'otp-countries',
+            category: 'OTP',
+            method: 'GET',
+            path: '/api/otp/countries',
+            description: 'Daftar negara untuk layanan OTP',
+            params: [
+                { name: 'service', type: 'text', required: true, placeholder: 'gacha' }
+            ]
+        }, {
+            id: 'otp-request',
+            category: 'OTP',
+            method: 'GET',
+            path: '/api/otp/request',
+            description: 'Request nomor OTP + auto polling',
+            params: [
+                { name: 'service', type: 'text', required: true, placeholder: 'gacha' },
+                { name: 'country', type: 'text', required: true, placeholder: 'Indonesia' }
+            ]
+        }, {
+            id: 'otp-list',
+            category: 'OTP',
+            method: 'GET',
+            path: '/api/otp/list',
+            description: 'Daftar nomor OTP aktif',
+            params: []
+        }, {
+            id: 'otp-check',
+            category: 'OTP',
+            method: 'GET',
+            path: '/api/otp/otp',
+            description: 'Cek OTP manual berdasarkan nomor',
+            params: [
+                { name: 'number', type: 'text', required: true, placeholder: '08123456789' }
+            ]
+        }, {
+            id: 'film-home',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/homepage',
+            description: 'Homepage Juragan Film',
+            params: [
+                { name: 'page', type: 'text', required: false, placeholder: '1' }
+            ]
+        }, {
+            id: 'film-category',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/category',
+            description: 'Kategori film Juragan Film',
+            params: [
+                { name: 'category', type: 'text', required: true, placeholder: 'ongoing' },
+                { name: 'page', type: 'text', required: false, placeholder: '1' }
+            ]
+        }, {
+            id: 'film-search',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/search',
+            description: 'Cari film di Juragan Film',
+            params: [
+                { name: 'query', type: 'text', required: true, placeholder: 'naruto' },
+                { name: 'page', type: 'text', required: false, placeholder: '1' }
+            ]
+        }, {
+            id: 'film-detail',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/detail',
+            description: 'Detail film + link streaming Juragan Film',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://tv44.juragan.film/film-seri/...' }
+            ]
+        }, {
+            id: 'cinesubs-home',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/cinesubs-home',
+            description: 'Homepage CineSubz',
+            params: []
+        }, {
+            id: 'cinesubs-search',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/cinesubs-search',
+            description: 'Cari film di CineSubz',
+            params: [
+                { name: 'query', type: 'text', required: true, placeholder: 'toy story' }
+            ]
+        }, {
+            id: 'cinesubs-movies',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/cinesubs-movies',
+            description: 'Daftar movie CineSubz',
+            params: [
+                { name: 'page', type: 'text', required: false, placeholder: '1' }
+            ]
+        }, {
+            id: 'cinesubs-tvshows',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/cinesubs-tvshows',
+            description: 'Daftar TV Show CineSubz',
+            params: [
+                { name: 'page', type: 'text', required: false, placeholder: '1' }
+            ]
+        }, {
+            id: 'cinesubs-genre',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/cinesubs-genre',
+            description: 'Film berdasarkan genre CineSubz',
+            params: [
+                { name: 'slug', type: 'text', required: true, placeholder: 'action' },
+                { name: 'page', type: 'text', required: false, placeholder: '1' }
+            ]
+        }, {
+            id: 'cinesubs-detail',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/cinesubs-detail',
+            description: 'Detail film CineSubz',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://cinesubz.net/movies/...' }
+            ]
+        }, {
+            id: 'cinesubs-episodes',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/cinesubs-episodes',
+            description: 'Daftar episode TV Show CineSubz',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://cinesubz.net/tvshows/...' }
+            ]
+        }, {
+            id: 'cinesubs-streaming',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/cinesubs-streaming',
+            description: 'Server streaming CineSubz',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://cinesubz.net/movies/...' }
+            ]
+        }, {
+            id: 'cinesubs-streaming-url',
+            category: 'Film',
+            method: 'GET',
+            path: '/api/film/cinesubs-streaming-url',
+            description: 'URL video streaming CineSubz',
+            params: [
+                { name: 'dataPost', type: 'text', required: true, placeholder: '16723' },
+                { name: 'dataNume', type: 'text', required: true, placeholder: '1' },
+                { name: 'dataType', type: 'text', required: true, placeholder: 'mv' }
+            ]
+        }, {
+            id: 'ytmp3',
+            category: 'Download',
+            method: 'GET',
+            path: '/api/download/ytmp3',
+            description: 'Download YouTube ke MP3 (via y2mate)',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://youtu.be/...' }
+            ]
+        }, {
+            id: 'ytmp4',
+            category: 'Download',
+            method: 'GET',
+            path: '/api/download/ytmp4',
+            description: 'Download YouTube ke MP4 (via y2mate)',
+            params: [
+                { name: 'url', type: 'text', required: true, placeholder: 'https://youtu.be/...' }
+            ]
+        }];
+
+        // ================================================================
+        //  RENDER SIDEBAR
+        // ================================================================
+        const endpointList = document.getElementById('endpointList');
+        const statsTotal = document.getElementById('totalEndpoints');
+
+        // Group by category
+        const categories = {};
+        ENDPOINTS.forEach(ep => {
+            const cat = ep.category || 'Uncategorized';
+            if (!categories[cat]) categories[cat] = [];
+            categories[cat].push(ep);
+        });
+
+        let html = '';
+        for (const [cat, eps] of Object.entries(categories)) {
+            html += `<div style="padding:4px 20px 8px;font-size:11px;font-weight:600;color:#4a5a72;text-transform:uppercase;letter-spacing:0.3px;">${cat}</div>`;
+            eps.forEach(ep => {
+                const methodClass = ep.method.toLowerCase();
+                html += `
+                        <div class="endpoint-item" data-id="${ep.id}" onclick="selectEndpoint('${ep.id}')">
+                            <span class="method-badge ${methodClass}">${ep.method}</span>
+                            <span class="endpoint-path">${ep.path}<span class="endpoint-desc">${ep.description}</span></span>
+                        </div>
+                    `;
+            });
+        }
+        endpointList.innerHTML = html;
+        statsTotal.textContent = ENDPOINTS.length;
+
+        // ================================================================
+        //  SELECT ENDPOINT
+        // ================================================================
+        let currentEndpoint = null;
+        let isSubmitting = false;
+
+        function selectEndpoint(id) {
+            // Update sidebar active
+            document.querySelectorAll('.endpoint-item').forEach(el => el.classList.remove('active'));
+            const activeEl = document.querySelector(`.endpoint-item[data-id="${id}"]`);
+            if (activeEl) activeEl.classList.add('active');
+
+            const ep = ENDPOINTS.find(e => e.id === id);
+            if (!ep) return;
+            currentEndpoint = ep;
+
+            // Update panel
+            document.getElementById('panelTitle').textContent = ep.path;
+            document.getElementById('panelSub').textContent = ep.description;
+            document.getElementById('panelMethod').textContent = `${ep.method} · ${ep.category}`;
+
+            // Build form
+            let formHtml = '';
+            const isFormData = ep.isFormData || false;
+
+            ep.params.forEach(p => {
+                let input = '';
+                const val = p.default || '';
+                if (p.type === 'select') {
+                    const options = p.options.map(opt =>
+                        `<option value="${opt}" ${opt === val ? 'selected' : ''}>${opt}</option>`
+                    ).join('');
+                    input =
+                        `<select id="param_${p.name}" ${p.required ? 'required' : ''}>${options}</select>`;
+                } else if (p.type === 'textarea') {
+                    input =
+                    `<textarea id="param_${p.name}" ${p.required ? 'required' : ''} placeholder="${p.placeholder || ''}">${val}</textarea>`;
+                } else {
+                    input =
+                        `<input type="text" id="param_${p.name}" ${p.required ? 'required' : ''} placeholder="${p.placeholder || ''}" value="${val}" />`;
+                }
+                formHtml += `
+                        <div class="form-group">
+                            <label>${p.name} ${p.required ? '<span style="color:#f26b6b;">*</span>' : ''}</label>
+                            ${input}
+                            ${p.placeholder ? `<div class="hint">${p.placeholder}</div>` : ''}
+                        </div>
+                    `;
+            });
+
+            // File upload
+            let fileHtml = '';
+            if (isFormData && ep.fileField) {
+                fileHtml = `
+                        <div class="form-group">
+                            <label>${ep.fileField} <span style="color:#f26b6b;">*</span></label>
+                            <input type="file" id="fileInput" accept="image/*,application/pdf,.docx,.pptx" />
+                            <div class="hint">Upload file (maks 25MB)</div>
+                        </div>
+                    `;
+            }
+
+            const panelContent = document.getElementById('panelContent');
+            panelContent.innerHTML = `
+                    <form id="testForm" onsubmit="submitTest(event)">
+                        ${formHtml}
+                        ${fileHtml}
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary" id="submitBtn">
+                                <span class="material-icons" style="font-size:18px;">send</span> Test Endpoint
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearResponse()">
+                                <span class="material-icons" style="font-size:18px;">clear</span> Clear
+                            </button>
+                        </div>
+                    </form>
+                    <div class="response-area" id="responseArea" style="display:none;">
+                        <div class="label">
+                            <span>Response</span>
+                            <span class="status-badge" id="statusBadge">●</span>
+                            <span id="statusCode" style="font-weight:600;"></span>
+                            <span style="color:#6b7a93;font-weight:400;font-size:12px;" id="responseTime"></span>
+                        </div>
+                        <div class="response-body" id="responseBody">// response akan tampil di sini</div>
+                    </div>
+                `;
+
+            // Reset response
+            clearResponse();
+        }
+
+        // ================================================================
+        //  SUBMIT TEST
+        // ================================================================
+        async function submitTest(e) {
+            e.preventDefault();
+            if (!currentEndpoint) return;
+            if (isSubmitting) return;
+
+            const ep = currentEndpoint;
+            const isFormData = ep.isFormData || false;
+            const method = ep.method.toUpperCase();
+            const submitBtn = document.getElementById('submitBtn');
+            const responseArea = document.getElementById('responseArea');
+            const responseBody = document.getElementById('responseBody');
+            const statusBadge = document.getElementById('statusBadge');
+            const statusCode = document.getElementById('statusCode');
+            const responseTime = document.getElementById('responseTime');
+
+            // Collect params
+            const params = {};
+            let hasFile = false;
+            let fileBuffer = null;
+            let fileName = '';
+
+            if (isFormData && ep.fileField) {
+                const fileInput = document.getElementById('fileInput');
+                if (fileInput && fileInput.files && fileInput.files.length > 0) {
+                    hasFile = true;
+                    fileBuffer = fileInput.files[0];
+                    fileName = fileBuffer.name;
+                } else {
+                    // Check if file is required (for actions that need it)
+                    const hasRequiredFile = ['web2apk', 'ilovepdf', 'iloveimg'].includes(ep.id);
+                    if (hasRequiredFile) {
+                        alert('Silakan pilih file terlebih dahulu.');
+                        return;
+                    }
+                }
+            }
+
+            ep.params.forEach(p => {
+                const el = document.getElementById(`param_${p.name}`);
+                if (el) {
+                    let val = el.value;
+                    if (p.type === 'select' && p.options) {
+                        // jika default tidak ada, ambil option pertama
+                        if (!val) val = p.options[0] || '';
+                    }
+                    params[p.name] = val;
+                }
+            });
+
+            // Build URL
+            let url = `${BASE_URL}${ep.path}`;
+            const queryParams = new URLSearchParams();
+
+            if (method === 'GET') {
+                Object.keys(params).forEach(key => {
+                    if (params[key]) queryParams.append(key, params[key]);
+                });
+                const qs = queryParams.toString();
+                if (qs) url += '?' + qs;
+            }
+
+            // Show loading
+            isSubmitting = true;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="material-icons" style="font-size:18px;">hourglass_top</span> Loading...';
+            responseArea.style.display = 'block';
+            responseBody.textContent = '⏳ Menunggu response...';
+            statusBadge.textContent = '●';
+            statusBadge.className = 'status-badge loading';
+            statusCode.textContent = '';
+            responseTime.textContent = '';
+
+            const startTime = Date.now();
+
+            try {
+                let response;
+                const headers = {
+                    'Accept': 'application/json'
+                };
+
+                if (method === 'GET') {
+                    response = await fetch(url, { headers });
+                } else {
+                    // POST
+                    let body;
+                    let contentType;
+
+                    if (isFormData && hasFile) {
+                        // FormData untuk upload file
+                        const formData = new FormData();
+                        Object.keys(params).forEach(key => {
+                            if (params[key]) formData.append(key, params[key]);
+                        });
+                        if (fileBuffer) {
+                            formData.append(ep.fileField || 'file', fileBuffer, fileName);
+                        }
+                        body = formData;
+                        // jangan set Content-Type, browser akan set dengan boundary
+                    } else {
+                        // JSON
+                        contentType = 'application/json';
+                        body = JSON.stringify(params);
+                        headers['Content-Type'] = contentType;
+                    }
+
+                    response = await fetch(url, {
+                        method: 'POST',
+                        headers,
+                        body
+                    });
+                }
+
+                const elapsed = Date.now() - startTime;
+                responseTime.textContent = `${elapsed}ms`;
+
+                // Cek content-type
+                const contentType = response.headers.get('content-type') || '';
+
+                if (contentType.includes('application/json')) {
+                    const json = await response.json();
+                    statusCode.textContent = response.status;
+                    if (response.ok) {
+                        statusBadge.textContent = '✓ Success';
+                        statusBadge.className = 'status-badge success';
+                    } else {
+                        statusBadge.textContent = '✗ Error';
+                        statusBadge.className = 'status-badge error';
+                    }
+                    responseBody.textContent = JSON.stringify(json, null, 2);
+                } else if (contentType.includes('application/octet-stream') || contentType.includes('image/') ||
+                    contentType.includes('application/pdf')) {
+                    // Binary response (file download)
+                    const blob = await response.blob();
+                    statusCode.textContent = response.status;
+                    if (response.ok) {
+                        statusBadge.textContent = '✓ File Downloaded';
+                        statusBadge.className = 'status-badge success';
+                        // Tampilkan link download
+                        const urlObj = URL.createObjectURL(blob);
+                        const ext = contentType.includes('pdf') ? 'pdf' :
+                            contentType.includes('png') ? 'png' :
+                            contentType.includes('jpeg') ? 'jpg' : 'bin';
+                        responseBody.innerHTML =
+                            `📥 File berhasil diunduh! <br/><br/><a href="${urlObj}" download="output.${ext}" style="color:#7aa2f7;text-decoration:underline;">Klik di sini untuk download</a>`;
+                    } else {
+                        statusBadge.textContent = '✗ Error';
+                        statusBadge.className = 'status-badge error';
+                        responseBody.textContent = `Gagal download file. Status: ${response.status}`;
+                    }
+                } else {
+                    // Text response
+                    const text = await response.text();
+                    statusCode.textContent = response.status;
+                    if (response.ok) {
+                        statusBadge.textContent = '✓ Success';
+                        statusBadge.className = 'status-badge success';
+                    } else {
+                        statusBadge.textContent = '✗ Error';
+                        statusBadge.className = 'status-badge error';
+                    }
+                    responseBody.textContent = text;
+                }
+
+            } catch (err) {
+                const elapsed = Date.now() - startTime;
+                responseTime.textContent = `${elapsed}ms`;
+                statusCode.textContent = '500';
+                statusBadge.textContent = '✗ Error';
+                statusBadge.className = 'status-badge error';
+                responseBody.textContent = `❌ Error: ${err.message}`;
+            }
+
+            isSubmitting = false;
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span class="material-icons" style="font-size:18px;">send</span> Test Endpoint';
+            document.getElementById('lastResponse').textContent = `${elapsed}ms`;
+        }
+
+        function clearResponse() {
+            const area = document.getElementById('responseArea');
+            if (area) area.style.display = 'none';
+        }
+
+        // ================================================================
+        //  INIT — select first endpoint
+        // ================================================================
+        if (ENDPOINTS.length > 0) {
+            selectEndpoint(ENDPOINTS[0].id);
+        }
+    </script>
+
+</body>
+</html>
