@@ -1,25 +1,26 @@
 // api/tempmail/generate.js
-const TempmailV3 = require('../../services/tempmail');
+const Tempmail = require('../../services/tempmail');
 
 module.exports = async (req, res) => {
     const startTime = Date.now();
-    const { expire = 10 } = req.method === 'GET' ? req.query : req.body;
 
-    const expireNum = parseInt(expire);
-    if (isNaN(expireNum) || expireNum <= 0) {
+    const { length = 10 } = req.method === 'GET' ? req.query : req.body;
+
+    const lengthNum = parseInt(length);
+    if (isNaN(lengthNum) || lengthNum < 5 || lengthNum > 20) {
         return res.status(400).json({
             status: false,
             statusCode: 400,
             author: '@velz',
-            error: 'Parameter "expire" harus angka positif (menit). Contoh: ?expire=10',
+            error: 'Parameter "length" harus angka antara 5–20.',
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
         });
     }
 
     try {
-        const tempmail = new TempmailV3();
-        const result = await tempmail.generate(expireNum);
+        const tempmail = new Tempmail();
+        const result = await tempmail.generate(lengthNum);
 
         res.status(200).json({
             status: true,
@@ -27,9 +28,7 @@ module.exports = async (req, res) => {
             author: '@velz',
             result: {
                 email: result.email,
-                visitorId: result.visitorId,
-                expireMinutes: expireNum,
-                note: 'Simpan visitorId untuk mengecek inbox.'
+                note: 'Gunakan email ini untuk cek inbox di /api/tempmail/inbox'
             },
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
