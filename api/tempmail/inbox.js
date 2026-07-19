@@ -1,4 +1,4 @@
-// api/tempmail1sec/inbox.js
+// api/tempmail/inbox.js
 const Tempmail1sec = require('../../services/tempmail');
 
 module.exports = async (req, res) => {
