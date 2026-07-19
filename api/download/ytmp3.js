@@ -1,102 +1,83 @@
 // api/download/ytmp3.js
-const axios = require('axios');
-
-const browserHeaders = {
-    'User-Agent': 'Mozilla/5.0 (Linux; Android 16; Infinix X6837 Build/BP2A.250605.031.A2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.7778.217 Mobile Safari/537.36',
-    'Accept': '*/*',
-    'Origin': 'https://y2mate.cc',
-    'Referer': 'https://y2mate.cc/',
-    'X-Requested-With': 'com.xbrowser.play',
-    'Sec-Fetch-Site': 'cross-site',
-    'Sec-Fetch-Mode': 'cors'
-};
-
-async function ytmp3(youtubeUrl, format = 'mp3') {
-    const match = /(?:youtu\.be\/|youtube\.com\/(?:embed\/|live\/|shorts\/)|[?&]v=)([a-zA-Z0-9-_]{11})/.exec(youtubeUrl);
-    if (!match) throw new Error('URL YouTube tidak valid');
-    const videoId = match[1];
-    const endpoint = 'etacloud.org';
-    const getTs = () => Date.now();
-
-    const safeFetch = async (url, options = {}) => {
-        const res = await axios.get(url, {
-            headers: { ...browserHeaders, ...options.headers },
-            validateStatus: () => true
-        });
-        if (typeof res.data === 'string' && res.data.startsWith('{')) {
-            return JSON.parse(res.data);
-        }
-        return res.data;
-    };
-
-    const appendParam = (url, params) => url.includes('?') ? `${url}&${params}` : `${url}?${params}`;
-
-    try {
-        const authData = await safeFetch(`https://eta.${endpoint}/api/v1/auth?_=${getTs()}`);
-        if (authData.error > 0) throw new Error('Authorization gagal');
-
-        const initData = await safeFetch(`https://eta.${endpoint}/api/v1/init?_=${getTs()}`, {
-            headers: { 'Authorization': `Bearer ${authData.key}` }
-        });
-        if (initData.error > 0) throw new Error('Initialization gagal');
-
-        let fetchUrl = appendParam(initData.convertURL, `v=${videoId}&f=${format}&_=${getTs()}`);
-        let convertData = await safeFetch(fetchUrl);
-        if (convertData.error > 0) throw new Error(`Server menolak konversi. Error Code: ${convertData.error}`);
-        if (convertData.redirect === 1) {
-            fetchUrl = appendParam(convertData.redirectURL, `v=${videoId}&f=${format}&_=${getTs()}`);
-            convertData = await safeFetch(fetchUrl);
-        }
-
-        while (convertData.progress !== undefined && convertData.progress < 3) {
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            const progressUrl = appendParam(convertData.progressURL, `_=${getTs()}`);
-            convertData = await safeFetch(progressUrl);
-            if (convertData.error > 0) throw new Error('Server gagal saat men-convert');
-        }
-
-        return {
-            videoId,
-            format,
-            title: convertData.title || '',
-            downloadURL: convertData.downloadURL || ''
-        };
-    } catch (error) {
-        throw new Error(error.message || 'Gagal mengonversi YouTube ke MP3');
-    }
-}
+const fetch = require('node-fetch');
 
 module.exports = async (req, res) => {
     const startTime = Date.now();
-    const { url, format = 'mp3' } = req.method === 'GET' ? req.query : req.body;
+    const url = req.method === 'GET' ? req.query.url : req.body.url;
 
     if (!url) {
         return res.status(400).json({
             status: false,
             statusCode: 400,
             author: '@velz',
-            error: 'Parameter "url" (YouTube URL) wajib diisi.',
+            error: 'Parameter "url" wajib diisi.',
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
         });
     }
 
     try {
-        const result = await ytmp3(url, format);
+        // Coba ytdown.to
+        const step1 = await fetch('https://app.ytdown.to/proxy.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'User-Agent': 'Mozilla/5.0',
+                'Origin': 'https://app.ytdown.to',
+                'Referer': 'https://app.ytdown.to/id2/',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: `url=${encodeURIComponent(url)}`
+        });
+
+        const videoInfo = await step1.json();
+
+        if (!videoInfo.api || videoInfo.api.status !== 'ok') {
+            throw new Error('Gagal mengambil info video');
+        }
+
+        const { title, mediaItems } = videoInfo.api;
+        const audios = mediaItems.filter(v => v.type === 'Audio');
+
+        if (audios.length === 0) {
+            throw new Error('Tidak ada format audio tersedia');
+        }
+
+        const target = audios[0];
+
+        const step2 = await fetch('https://app.ytdown.to/proxy.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Origin': 'https://app.ytdown.to',
+                'Referer': 'https://app.ytdown.to/id2/'
+            },
+            body: `url=${encodeURIComponent(target.mediaUrl)}`
+        });
+
+        const data = await step2.json();
+
         res.status(200).json({
             status: true,
             statusCode: 200,
             author: '@velz',
-            result,
+            result: {
+                title: title || 'YouTube Audio',
+                type: 'mp3',
+                url: data.api.fileUrl,
+                filename: data.api.fileName || `${title}.mp3`,
+                size: data.api.fileSize || 'Unknown'
+            },
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
         });
+
     } catch (error) {
         res.status(500).json({
             status: false,
             statusCode: 500,
             author: '@velz',
-            error: error.message,
+            error: error.message || 'Gagal mendownload audio.',
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
         });
