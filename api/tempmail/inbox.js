@@ -1,79 +1,47 @@
 // api/tempmail/inbox.js
-const Tempmail1sec = require('../../services/tempmail');
+const TempmailV3 = require('../../services/tempmail');
 
 module.exports = async (req, res) => {
     const startTime = Date.now();
-    const { email, readId } = req.method === 'GET' ? req.query : req.body;
+    const { visitorId } = req.method === 'GET' ? req.query : req.body;
 
-    if (!email) {
+    if (!visitorId) {
         return res.status(400).json({
             status: false,
             statusCode: 400,
             author: '@velz',
-            error: 'Parameter "email" wajib diisi.',
-            responseTimeMs: Date.now() - startTime,
-            timestamp: new Date().toISOString()
-        });
-    }
-
-    // Validasi format email
-    if (!email.includes('@') || !email.split('@')[1]) {
-        return res.status(400).json({
-            status: false,
-            statusCode: 400,
-            author: '@velz',
-            error: 'Format email tidak valid.',
+            error: 'Parameter "visitorId" wajib diisi (didapat dari generate).',
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
         });
     }
 
     try {
-        const tempmail = new Tempmail1sec();
+        const tempmail = new TempmailV3();
+        const messages = await tempmail.inbox(visitorId);
 
-        // Jika ada readId, baca detail pesan
-        if (readId) {
-            const detail = await tempmail.readMessage(email, readId);
-            return res.status(200).json({
-                status: true,
-                statusCode: 200,
-                author: '@velz',
-                result: detail,
-                responseTimeMs: Date.now() - startTime,
-                timestamp: new Date().toISOString()
-            });
-        }
-
-        // Jika tidak, ambil daftar pesan
-        const messages = await tempmail.inbox(email);
-
-        // Jika tidak ada pesan
         if (!messages || messages.length === 0) {
             return res.status(200).json({
                 status: true,
                 statusCode: 200,
                 author: '@velz',
                 result: {
-                    email,
                     messages: [],
                     total: 0,
-                    note: 'Belum ada pesan masuk. Coba kirim email ke alamat ini.'
+                    note: 'Belum ada pesan masuk. Coba kirim email ke alamat yang di-generate.'
                 },
                 responseTimeMs: Date.now() - startTime,
                 timestamp: new Date().toISOString()
             });
         }
 
-        // Kirim daftar pesan dengan petunjuk untuk baca detail
         res.status(200).json({
             status: true,
             statusCode: 200,
             author: '@velz',
             result: {
-                email,
                 messages: messages,
-                total: messages.length,
-                hint: 'Gunakan parameter "readId" dengan ID pesan untuk membaca detail.'
+                total: messages.length
             },
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
