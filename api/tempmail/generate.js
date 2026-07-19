@@ -1,33 +1,35 @@
 // api/tempmail/generate.js
-const { Tempmail } = require('../../services/tempmail');
+const Tempmail1sec = require('../../services/tempmail');
 
 module.exports = async (req, res) => {
     const startTime = Date.now();
+    const { count = 1 } = req.method === 'GET' ? req.query : req.body;
 
-    const { length = 10 } = req.method === 'GET' ? req.query : req.body;
-
-    // Validasi length
-    const lengthNum = parseInt(length);
-    if (isNaN(lengthNum) || lengthNum <= 0) {
+    const countNum = parseInt(count);
+    if (isNaN(countNum) || countNum < 1 || countNum > 10) {
         return res.status(400).json({
             status: false,
             statusCode: 400,
             author: '@velz',
-            error: 'Parameter "length" harus berupa angka positif (contoh: 10).',
+            error: 'Parameter "count" harus angka antara 1–10.',
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
         });
     }
 
     try {
-        const tempmail = new Tempmail();
-        const result = await tempmail.generate(lengthNum);
+        const tempmail = new Tempmail1sec();
+        const emails = await tempmail.generate(countNum);
 
         res.status(200).json({
             status: true,
             statusCode: 200,
             author: '@velz',
-            result: result,
+            result: {
+                emails: Array.isArray(emails) ? emails : [emails],
+                total: Array.isArray(emails) ? emails.length : 1,
+                note: 'Gunakan email ini untuk cek inbox di /api/tempmail1sec/inbox'
+            },
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
         });
@@ -36,7 +38,7 @@ module.exports = async (req, res) => {
             status: false,
             statusCode: 500,
             author: '@velz',
-            error: error.message || 'Gagal generate email.',
+            error: error.message,
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
         });
