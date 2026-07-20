@@ -1,9 +1,10 @@
 const axios = require('axios');
 
-// Header standar untuk request ke API AnimeLovers
+// ===== HEADER YANG DISESUAIKAN DENGAN BOT =====
 const HEADERS = {
-  "Content-Type": "application/json",
-  "Accept": "application/json"
+  "Content-Type": "text/plain; charset=utf-8",  // <-- Diubah dari application/json
+  "Accept": "application/json",
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 };
 
 // Mapping durasi ke kode VIP internal
@@ -13,13 +14,12 @@ const DURASI_MAP = {
   '1tahun': 'Mzk3MjA4NDM3NjFfM18xMg=='
 };
 
-// Fungsi untuk format tanggal dari epoch
 function vipDate(epoch) {
   if (!epoch || epoch === 0) return "-";
   return new Date(epoch * 1000).toLocaleString("id-ID");
 }
 
-// Fungsi login ke AnimeLovers, mengembalikan token
+// ===== LOGIN =====
 async function login(email) {
   const payload = {
     user: "wibu",
@@ -27,9 +27,11 @@ async function login(email) {
     profil: "https://lh3.googleusercontent.com/a/ACg8ocIk6mQVP02KEycB9_MYhhtyiN8eyDaz_N3dp3OwwIDN30ri0XYS=s288-c-no"
   };
   try {
-    const response = await axios.post("https://apps.animekita.org/api/v1.1.6/model/login.php", payload, {
-      headers: HEADERS
-    });
+    const response = await axios.post(
+      "https://apps.animekita.org/api/v1.1.6/model/login.php",
+      JSON.stringify(payload),   // <-- Body tetap JSON string
+      { headers: HEADERS }       // <-- Header sudah disesuaikan
+    );
     const json = response.data;
     if (!json.data || !json.data[0] || !json.data[0].token) {
       throw new Error("Login gagal atau token tidak ditemukan.");
@@ -40,12 +42,14 @@ async function login(email) {
   }
 }
 
-// Fungsi untuk mengambil data user berdasarkan token
+// ===== GET DATA =====
 async function getData(token) {
   try {
-    const response = await axios.post("https://apps.animekita.org/api/v1.1.6/model/app-config.php", { token }, {
-      headers: HEADERS
-    });
+    const response = await axios.post(
+      "https://apps.animekita.org/api/v1.1.6/model/app-config.php",
+      JSON.stringify({ token }),  // <-- Body JSON string
+      { headers: HEADERS }
+    );
     const json = response.data;
     if (!json.data || !json.data[0]) {
       throw new Error("Data user kosong");
@@ -56,18 +60,25 @@ async function getData(token) {
   }
 }
 
-// Fungsi untuk mengaktifkan VIP
+// ===== SET PREMIUM =====
 async function setPremium(token, vipCode) {
+  // Untuk endpoint ini, bot menggunakan x-www-form-urlencoded, bukan JSON
   const params = new URLSearchParams();
   params.append('token', token);
   params.append('vip', vipCode);
+
+  // Header khusus untuk x-www-form-urlencoded
+  const formHeaders = {
+    ...HEADERS,
+    "Content-Type": "application/x-www-form-urlencoded"
+  };
+
   try {
-    const response = await axios.post("https://apps.animekita.org/api/v1.1.6/model/vip.php", params.toString(), {
-      headers: {
-        ...HEADERS,
-        "Content-Type": "application/x-www-form-urlencoded"
-      }
-    });
+    const response = await axios.post(
+      "https://apps.animekita.org/api/v1.1.6/model/vip.php",
+      params.toString(),
+      { headers: formHeaders }
+    );
     const json = response.data;
     if (json.status !== "success" && json.status !== 1) {
       throw new Error("Gagal aktivasi VIP.");
@@ -81,10 +92,8 @@ async function setPremium(token, vipCode) {
 // ========== ENDPOINT UTAMA ==========
 module.exports = async (req, res) => {
   try {
-    // Ambil parameter dari query string (GET) atau body (POST)
     const { email, durasi = '1bulan' } = req.method === 'GET' ? req.query : req.body;
 
-    // Validasi email
     if (!email) {
       return res.status(400).json({ 
         success: false, 
@@ -92,7 +101,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Validasi durasi
     const durasiKey = durasi.toLowerCase();
     if (!DURASI_MAP[durasiKey]) {
       return res.status(400).json({
@@ -103,13 +111,11 @@ module.exports = async (req, res) => {
 
     const vipCode = DURASI_MAP[durasiKey];
 
-    // Proses aktivasi
     const token = await login(email);
     const before = await getData(token);
     await setPremium(token, vipCode);
     const after = await getData(token);
 
-    // Format data sebelum & sesudah
     const formatData = (data) => ({
       level: data.level || '-',
       rank: data.rank || '-',
@@ -117,7 +123,6 @@ module.exports = async (req, res) => {
       vipExp: data.vipExp ? vipDate(data.vipExp) : '-'
     });
 
-    // Kirim response sukses
     res.json({
       success: true,
       email,
@@ -128,7 +133,6 @@ module.exports = async (req, res) => {
     });
 
   } catch (error) {
-    // Tangani error
     res.status(500).json({
       success: false,
       error: error.message
