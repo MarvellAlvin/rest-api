@@ -2,10 +2,13 @@
 const axios = require('axios');
 
 const EXTERNAL_API = 'https://api.alwayscodex.my.id/api/tools/spam-otp';
-const MAX_COUNT = 5; // batas aman untuk Vercel (5 × 3 detik ≈ 15 detik)
+const MAX_COUNT = 5;
 
 /**
- * Kirim spam OTP secara sequential
+ * Kirim spam OTP secara sequential dengan detail per attempt
+ * @param {string} phone - Nomor telepon tujuan
+ * @param {number} count - Jumlah request
+ * @returns {Promise<{ success: number, failed: number, details: object[] }>}
  */
 async function sendSpamOtp(phone, count) {
     const details = [];
@@ -13,8 +16,16 @@ async function sendSpamOtp(phone, count) {
     let failed = 0;
 
     for (let i = 0; i < count; i++) {
+        const attempt = i + 1;
+        const startTime = Date.now();
+
+        let httpStatus = null;
+        let responseData = null;
+        let error = null;
+        let isSuccess = false;
+
         try {
-            const response = await axios.post(
+            const res = await axios.post(
                 EXTERNAL_API,
                 { phone },
                 {
@@ -23,19 +34,32 @@ async function sendSpamOtp(phone, count) {
                 }
             );
 
-            if (response.status === 200 && response.data?.status === true) {
+            httpStatus = res.status;
+            responseData = res.data;
+            isSuccess = (res.status === 200 && res.data?.status === true);
+
+            if (isSuccess) {
                 success++;
-                details.push(`✅ ${i + 1}`);
             } else {
                 failed++;
-                const reason = response.data?.status === false ? 'API returned false' : 'unknown response';
-                details.push(`❌ ${i + 1} (${reason})`);
             }
-        } catch (error) {
+        } catch (err) {
+            httpStatus = err.response?.status || null;
+            responseData = err.response?.data || null;
+            error = err.code === 'ECONNABORTED' ? 'timeout' : err.message;
             failed++;
-            const errorMsg = error.code === 'ECONNABORTED' ? 'timeout' : error.message;
-            details.push(`❌ ${i + 1} (${errorMsg})`);
         }
+
+        const durationMs = Date.now() - startTime;
+
+        details.push({
+            attempt,
+            success: isSuccess,
+            httpStatus,
+            durationMs,
+            response: responseData,
+            error
+        });
     }
 
     return { success, failed, details };
