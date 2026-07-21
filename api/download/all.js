@@ -4,6 +4,7 @@ const axios = require('axios');
 // ===== KONFIGURASI =====
 const BASE_URL = 'https://api.everyvideo.app';
 const TIMEOUT = 30000; // 30 detik
+const MAX_RETRIES = 3;
 
 // ===== HEADER =====
 const HEADERS = {
@@ -11,24 +12,64 @@ const HEADERS = {
     'Referer': 'https://www.everyvideo.app/',
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
     'Accept': 'application/json',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Accept-Language': 'en-US,en;q=0.9',
     'Content-Type': 'application/json'
 };
 
-// ===== FETCH METADATA =====
-async function fetchMetadata(url) {
-    try {
-        const encodedUrl = encodeURIComponent(url);
-        const response = await axios.get(
-            `${BASE_URL}/api/metadata/preview?url=${encodedUrl}`,
-            { headers: HEADERS, timeout: TIMEOUT }
-        );
-        return response.data;
-    } catch (error) {
-        if (error.response) {
-            throw new Error(`Metadata error: ${error.response.status} - ${error.response.data?.error || error.response.statusText}`);
+// ===== FETCH METADATA WITH RETRY =====
+async function fetchMetadataWithRetry(url, maxRetries = MAX_RETRIES) {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const encodedUrl = encodeURIComponent(url);
+            const response = await axios.get(
+                `${BASE_URL}/api/metadata/preview?url=${encodedUrl}`,
+                { 
+                    headers: HEADERS, 
+                    timeout: TIMEOUT,
+                    validateStatus: (status) => status < 500
+                }
+            );
+            
+            if (response.status === 200) {
+                return response.data;
+            }
+            
+            // Handle specific status codes
+            if (response.status === 429) {
+                throw new Error('429 - Rate limit exceeded');
+            }
+            
+            if (response.status >= 500) {
+                throw new Error(`${response.status} - Server error`);
+            }
+            
+            throw new Error(`${response.status} - ${response.statusText}`);
+            
+        } catch (error) {
+            lastError = error;
+            
+            // Jika error karena timeout atau 522, retry
+            if (error.message.includes('timeout') || 
+                error.message.includes('522') || 
+                error.message.includes('ECONNABORTED')) {
+                
+                if (attempt < maxRetries) {
+                    const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+                    console.log(`[EveryVideo] Retry ${attempt}/${maxRetries} after ${Math.round(delay)}ms`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+            }
+            
+            // Jika bukan timeout, langsung throw
+            throw error;
         }
-        throw new Error(`Metadata error: ${error.message}`);
     }
+    
+    throw lastError || new Error('Max retries exceeded');
 }
 
 // ===== SELECT BEST FORMAT =====
@@ -38,7 +79,6 @@ function selectBestFormat(metadata) {
         throw new Error('Tidak ada format video yang tersedia');
     }
     
-    // Urutkan berdasarkan height terbesar (kualitas terbaik)
     const sorted = [...formats].sort((a, b) => (b.height || 0) - (a.height || 0));
     return sorted[0];
 }
@@ -85,17 +125,14 @@ async function getDownloadUrl(jobId) {
             }
         );
 
-        // Cek header location untuk redirect
         if (response.headers.location) {
             return response.headers.location;
         }
 
-        // Jika tidak ada redirect, cek response data
         if (response.data && response.data.download_url) {
             return response.data.download_url;
         }
 
-        // Jika masih tidak ada, return URL job
         return `${BASE_URL}/api/dl/${jobId}/download`;
     } catch (error) {
         if (error.response) {
@@ -108,8 +145,8 @@ async function getDownloadUrl(jobId) {
 // ===== MAIN DOWNLOADER =====
 async function everyVideoDownloader(url, includeDetails = false) {
     try {
-        // 1. Fetch metadata
-        const metadata = await fetchMetadata(url);
+        // 1. Fetch metadata dengan retry
+        const metadata = await fetchMetadataWithRetry(url);
 
         if (!metadata.available) {
             throw new Error('Media tidak tersedia atau tidak dapat diakses');
@@ -152,7 +189,6 @@ async function everyVideoDownloader(url, includeDetails = false) {
             source: 'EveryVideo'
         };
 
-        // Tambahkan details jika diminta
         if (includeDetails) {
             result.video_formats = metadata.video_formats || [];
             result.audio_formats = metadata.audio_formats || [];
@@ -170,10 +206,8 @@ async function everyVideoDownloader(url, includeDetails = false) {
 module.exports = async (req, res) => {
     const startTime = Date.now();
 
-    // Ambil parameter dari query (GET) atau body (POST)
     const { url, details = false } = req.method === 'GET' ? req.query : req.body;
 
-    // ===== VALIDASI =====
     if (!url) {
         return res.status(400).json({
             status: false,
@@ -185,7 +219,6 @@ module.exports = async (req, res) => {
         });
     }
 
-    // Validasi URL
     try {
         new URL(url);
     } catch (error) {
@@ -200,10 +233,8 @@ module.exports = async (req, res) => {
     }
 
     try {
-        // Proses download
         const result = await everyVideoDownloader(url, details === 'true' || details === true);
 
-        // ===== RESPON SUKSES =====
         res.status(200).json({
             status: true,
             statusCode: 200,
@@ -216,7 +247,6 @@ module.exports = async (req, res) => {
     } catch (error) {
         console.error('[EveryVideo Downloader] Error:', error.message);
 
-        // ===== RESPON ERROR =====
         let statusCode = 500;
         let errorMessage = error.message;
 
@@ -227,9 +257,9 @@ module.exports = async (req, res) => {
             statusCode = 404;
         } else if (error.message.includes('URL tidak valid')) {
             statusCode = 400;
-        } else if (error.message.includes('timeout')) {
+        } else if (error.message.includes('timeout') || error.message.includes('522')) {
             statusCode = 408;
-            errorMessage = 'Request timeout: Server tidak merespons dalam waktu yang ditentukan.';
+            errorMessage = 'Server EveryVideo tidak merespons. Silakan coba lagi nanti.';
         } else if (error.message.includes('502') || error.message.includes('503') || error.message.includes('504')) {
             statusCode = 503;
             errorMessage = 'Server EveryVideo sedang sibuk. Silakan coba lagi nanti.';
