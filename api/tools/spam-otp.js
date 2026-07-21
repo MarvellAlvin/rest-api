@@ -8,12 +8,18 @@ const MAX_COUNT = 5;
  * Kirim spam OTP secara sequential dengan detail per attempt
  * @param {string} phone - Nomor telepon tujuan
  * @param {number} count - Jumlah request
- * @returns {Promise<{ success: number, failed: number, details: object[] }>}
+ * @returns {Promise<{ 
+ *   success: number, 
+ *   failed: number, 
+ *   details: object[],
+ *   totalRoundsTriggered: number 
+ * }>}
  */
 async function sendSpamOtp(phone, count) {
     const details = [];
     let success = 0;
     let failed = 0;
+    let totalRoundsTriggered = 0;
 
     for (let i = 0; i < count; i++) {
         const attempt = i + 1;
@@ -40,6 +46,10 @@ async function sendSpamOtp(phone, count) {
 
             if (isSuccess) {
                 success++;
+                // Ambil totalRounds dari response jika ada
+                if (typeof res.data?.totalRounds === 'number') {
+                    totalRoundsTriggered += res.data.totalRounds;
+                }
             } else {
                 failed++;
             }
@@ -52,17 +62,27 @@ async function sendSpamOtp(phone, count) {
 
         const durationMs = Date.now() - startTime;
 
+        // Mapping response: hanya simpan totalRounds jika sukses, 
+        // jika gagal simpan response asli untuk debugging
+        let mappedResponse = null;
+        if (isSuccess && responseData && typeof responseData.totalRounds === 'number') {
+            mappedResponse = { totalRounds: responseData.totalRounds };
+        } else if (!isSuccess && responseData) {
+            // Gagal, simpan response asli (mentah) agar mudah debug
+            mappedResponse = responseData;
+        }
+
         details.push({
             attempt,
             success: isSuccess,
             httpStatus,
             durationMs,
-            response: responseData,
+            response: mappedResponse,
             error
         });
     }
 
-    return { success, failed, details };
+    return { success, failed, details, totalRoundsTriggered };
 }
 
 module.exports = async (req, res) => {
@@ -110,10 +130,16 @@ module.exports = async (req, res) => {
             author: '@velz',
             result: {
                 phone,
-                totalRequested: count,
+                jobsStarted: count,
                 success: result.success,
                 failed: result.failed,
-                details: result.details
+                details: result.details,
+                summary: {
+                    jobsStarted: count,
+                    successfulJobs: result.success,
+                    failedJobs: result.failed,
+                    totalRoundsTriggered: result.totalRoundsTriggered
+                }
             },
             responseTimeMs: Date.now() - startTime,
             timestamp: new Date().toISOString()
