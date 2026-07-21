@@ -1,4 +1,4 @@
-// api/tools/cctv/detail.js
+// api/cctv/detail.js
 const BadilagCctv = require('../../../services/cctv');
 
 module.exports = async (req, res) => {
