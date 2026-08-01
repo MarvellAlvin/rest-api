@@ -2,10 +2,10 @@
 const axios = require('axios');
 
 // ===== KONFIGURASI =====
-const API_KEY = "DEZZIFY-AMPREM"; // <-- API key baru
+const API_KEY = "DEZZIFY-AMPREM";
 const BASE_URL = 'https://am-prem.vxz.my.id/api';
 const MAX_LIMIT = 20;
-const DEBUG = true; // Set ke false untuk nonaktifkan log
+const DEBUG = true;
 
 // ===== FUNGSI LOGGING =====
 function log(message, data = null) {
@@ -17,22 +17,24 @@ function log(message, data = null) {
     }
 }
 
-// ===== GENERATE TEMP EMAIL =====
+// ===== GENERATE TEMP EMAIL (pakai 1secmail) =====
 async function generateTempEmail() {
     try {
-        log('Generating temp email...');
+        log('Generating temp email via 1secmail...');
         
+        // 1secmail: generate random email
         const response = await axios.get(
-            'https://api.temp-mail.org/request/domains/format/json',
+            'https://api.1secmail.com/v1/?action=genRandomMailbox&count=1',
             { timeout: 10000 }
         );
         
-        const domains = response.data || ['temp-mail.org'];
-        const domain = domains[Math.floor(Math.random() * domains.length)];
-        const username = Math.random().toString(36).substring(2, 12);
-        const email = `${username}@${domain}`;
+        if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+            throw new Error('Failed to generate email from 1secmail');
+        }
         
+        const email = response.data[0];
         log(`Email generated: ${email}`);
+        
         return {
             success: true,
             email: email,
@@ -71,31 +73,44 @@ async function sendActivation(email) {
     }
 }
 
-// ===== WAIT FOR INBOX =====
+// ===== WAIT FOR INBOX (pakai 1secmail) =====
 async function waitForInbox(email) {
     const maxWaitTime = 120000; // 2 menit
     const pollInterval = 3000; // 3 detik
     const startTime = Date.now();
     
-    log('Waiting for verification link in inbox...');
+    log('Waiting for verification link in inbox via 1secmail...');
+    
+    // Parse email untuk mendapatkan login dan domain
+    const [login, domain] = email.split('@');
     
     while (Date.now() - startTime < maxWaitTime) {
         try {
+            // Cek inbox via 1secmail
             const response = await axios.get(
-                `https://api.temp-mail.org/request/mail/id/${email}/format/json`,
+                `https://api.1secmail.com/v1/?action=getMessages&login=${login}&domain=${domain}`,
                 { timeout: 10000 }
             );
             
             const messages = Array.isArray(response.data) ? response.data : [];
             
+            // Jika ada pesan, ambil detailnya
             for (const msg of messages) {
+                // Ambil detail pesan
+                const detailResponse = await axios.get(
+                    `https://api.1secmail.com/v1/?action=readMessage&login=${login}&domain=${domain}&id=${msg.id}`,
+                    { timeout: 10000 }
+                );
+                
+                const detail = detailResponse.data;
                 let textToSearch = '';
-                if (msg.body_text) {
-                    textToSearch = msg.body_text;
-                } else if (msg.body_html) {
-                    textToSearch = msg.body_html;
+                
+                if (detail.textBody) {
+                    textToSearch = detail.textBody;
+                } else if (detail.htmlBody) {
+                    textToSearch = detail.htmlBody;
                 } else {
-                    textToSearch = typeof msg === 'string' ? msg : JSON.stringify(msg);
+                    textToSearch = JSON.stringify(detail);
                 }
                 
                 textToSearch = textToSearch.replace(/&amp;/g, '&');
