@@ -1,11 +1,17 @@
 // api/tools/amprem.js
 const axios = require('axios');
+const https = require('https');
 
 // ===== KONFIGURASI =====
 const API_KEY = "DEZZIFY-AMPREM";
 const BASE_URL = 'https://am-prem.vxz.my.id/api';
 const MAX_LIMIT = 20;
 const DEBUG = true;
+
+// ===== AGENT HTTPS (abaikan SSL) =====
+const httpsAgent = new https.Agent({
+    rejectUnauthorized: false
+});
 
 // ===== FUNGSI LOGGING =====
 function log(message, data = null) {
@@ -17,15 +23,18 @@ function log(message, data = null) {
     }
 }
 
-// ===== GENERATE TEMP EMAIL (pakai 1secmail) =====
+// ===== GENERATE TEMP EMAIL (1secmail) =====
 async function generateTempEmail() {
     try {
         log('Generating temp email via 1secmail...');
         
-        // 1secmail: generate random email
+        // Gunakan domain utama 1secmail.com (bukan api.1secmail.com)
         const response = await axios.get(
-            'https://api.1secmail.com/v1/?action=genRandomMailbox&count=1',
-            { timeout: 10000 }
+            'https://1secmail.com/api/v1/?action=genRandomMailbox&count=1',
+            { 
+                timeout: 10000,
+                httpsAgent: httpsAgent // bypass SSL
+            }
         );
         
         if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
@@ -56,7 +65,8 @@ async function sendActivation(email) {
             timeout: 30000,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+            },
+            httpsAgent: httpsAgent
         });
         
         if (!response.data || response.data.success !== true) {
@@ -73,7 +83,7 @@ async function sendActivation(email) {
     }
 }
 
-// ===== WAIT FOR INBOX (pakai 1secmail) =====
+// ===== WAIT FOR INBOX (1secmail) =====
 async function waitForInbox(email) {
     const maxWaitTime = 120000; // 2 menit
     const pollInterval = 3000; // 3 detik
@@ -81,25 +91,29 @@ async function waitForInbox(email) {
     
     log('Waiting for verification link in inbox via 1secmail...');
     
-    // Parse email untuk mendapatkan login dan domain
     const [login, domain] = email.split('@');
     
     while (Date.now() - startTime < maxWaitTime) {
         try {
-            // Cek inbox via 1secmail
+            // Cek inbox menggunakan domain utama
             const response = await axios.get(
-                `https://api.1secmail.com/v1/?action=getMessages&login=${login}&domain=${domain}`,
-                { timeout: 10000 }
+                `https://1secmail.com/api/v1/?action=getMessages&login=${login}&domain=${domain}`,
+                { 
+                    timeout: 10000,
+                    httpsAgent: httpsAgent
+                }
             );
             
             const messages = Array.isArray(response.data) ? response.data : [];
             
-            // Jika ada pesan, ambil detailnya
             for (const msg of messages) {
                 // Ambil detail pesan
                 const detailResponse = await axios.get(
-                    `https://api.1secmail.com/v1/?action=readMessage&login=${login}&domain=${domain}&id=${msg.id}`,
-                    { timeout: 10000 }
+                    `https://1secmail.com/api/v1/?action=readMessage&login=${login}&domain=${domain}&id=${msg.id}`,
+                    { 
+                        timeout: 10000,
+                        httpsAgent: httpsAgent
+                    }
                 );
                 
                 const detail = detailResponse.data;
@@ -143,7 +157,8 @@ async function verifyAccount(email, link) {
             timeout: 30000,
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
+            },
+            httpsAgent: httpsAgent
         });
         
         if (!response.data || response.data.success !== true) {
